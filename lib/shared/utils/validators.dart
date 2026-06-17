@@ -23,6 +23,16 @@ class Validators {
     return null;
   }
 
+  /// Phone: required, allows digits, spaces, and +()- separators; needs >= 7 digits.
+  static String? phone(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Phone number is required';
+    final cleaned = v.replaceAll(RegExp(r'[\s()\-]'), '');
+    if (!RegExp(r'^\+?[0-9]{7,15}$').hasMatch(cleaned)) {
+      return 'Enter a valid phone number';
+    }
+    return null;
+  }
+
   /// 0..4 password strength buckets used by the strength meter in Screen 3.
   static int passwordStrength(String v) {
     if (v.isEmpty) return 0;

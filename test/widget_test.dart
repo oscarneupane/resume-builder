@@ -71,6 +71,49 @@ void main() {
     });
   });
 
+  group('ResumeBuilderController.strengthScore', () {
+    test('empty resume scores 0', () {
+      expect(ResumeBuilderController().strengthScore, 0);
+    });
+
+    test('a fully built resume scores 100', () {
+      final c = ResumeBuilderController()
+        ..fullName = 'Ada Lovelace'
+        ..email = 'ada@example.com'
+        ..phone = '0412345678'
+        ..location = 'Sydney, AU'
+        ..title = 'Engineer'
+        ..summary = 'A' * 130
+        ..linkedin = 'in/ada'
+        ..addSkill('Dart')
+        ..addSkill('Flutter')
+        ..addSkill('SQL')
+        ..addSkill('Go')
+        ..addSkill('AWS')
+        ..addSkill('CI/CD');
+      c.experiences.first
+        ..title = 'Engineer'
+        ..company = 'Acme'
+        ..bullets = ['Shipped X', 'Improved Y by 30%', 'Led Z'];
+      c.education.first
+        ..degree = 'BSc'
+        ..school = 'UNSW';
+      c.certifications.add('AWS SAA');
+      c.languages.add('English');
+
+      expect(c.strengthScore, 100);
+    });
+
+    test('partial resume scores between 0 and 100', () {
+      final c = ResumeBuilderController()
+        ..fullName = 'Ada'
+        ..email = 'a@b.com';
+      final s = c.strengthScore;
+      expect(s, greaterThan(0));
+      expect(s, lessThan(100));
+    });
+  });
+
   group('CoverLetterResult.parse', () {
     test('parses the 3-format JSON object', () {
       final r = CoverLetterResult.parse(
@@ -113,6 +156,14 @@ void main() {
     test('password strength buckets 0..4', () {
       expect(Validators.passwordStrength(''), 0);
       expect(Validators.passwordStrength('aB3!xxxx'), 4);
+    });
+
+    test('phone validation', () {
+      expect(Validators.phone(''), isNotNull);
+      expect(Validators.phone('abc'), isNotNull);
+      expect(Validators.phone('123'), isNotNull); // too short
+      expect(Validators.phone('0412 345 678'), isNull);
+      expect(Validators.phone('+61 (412) 345-678'), isNull);
     });
   });
 }
