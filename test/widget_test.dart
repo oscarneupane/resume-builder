@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:applymate/core/constants.dart';
 import 'package:applymate/features/cover_letter/controllers/cover_letter_controller.dart';
+import 'package:applymate/features/linkedin_helper/controllers/linkedin_controller.dart';
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
 import 'package:applymate/models/resume_model.dart';
 import 'package:applymate/shared/utils/validators.dart';
@@ -144,6 +145,22 @@ void main() {
         ..jobTitle = 'Engineer'
         ..companyName = 'Acme';
       expect(c.canGenerate, isTrue);
+    });
+  });
+
+  group('LinkedInController', () {
+    test('canGenerate requires a job title', () {
+      final c = LinkedInController();
+      expect(c.canGenerate, isFalse);
+      c.jobTitle = 'Engineer';
+      expect(c.canGenerate, isTrue);
+    });
+
+    test('each section maps to the right AI feature', () {
+      expect(LinkedInSection.headline.feature, AiFeature.linkedinHeadline);
+      expect(LinkedInSection.about.feature, AiFeature.linkedinAbout);
+      expect(LinkedInSection.recruiter.feature, AiFeature.recruiterMessage);
+      expect(LinkedInSection.skills.feature, AiFeature.skillsSuggest);
     });
   });
 

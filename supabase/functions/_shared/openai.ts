@@ -58,6 +58,15 @@ Job title: ${s(ctx, 'jobTitle')}
 Return ONLY the improved bullet point. No explanations.`,
       };
 
+    case 'linkedinHeadline':
+      return {
+        json: false,
+        prompt: `Write 3 punchy LinkedIn headline options (max 120 chars each) for a
+${s(ctx, 'jobTitle')} with ${s(ctx, 'yearsExp')} years of experience.
+Skills: ${s(ctx, 'skills')}
+Return each headline on its own line, no numbering or quotes.`,
+      };
+
     case 'linkedinAbout':
       return {
         json: false,
@@ -65,6 +74,15 @@ Return ONLY the improved bullet point. No explanations.`,
 Name: ${s(ctx, 'name')} | Job Title: ${s(ctx, 'jobTitle')}
 Skills: ${s(ctx, 'skills')} | Career Goal: ${s(ctx, 'goal')}
 Max 300 words. Professional tone. First person.`,
+      };
+
+    case 'recruiterMessage':
+      return {
+        json: false,
+        prompt: `Write a short, friendly cold outreach message to a recruiter (max 90 words)
+from a ${s(ctx, 'jobTitle')} with ${s(ctx, 'yearsExp')} years of experience.
+Skills: ${s(ctx, 'skills')}
+Polite, specific, and easy to reply to. Return only the message.`,
       };
 
     case 'interviewAnswer':

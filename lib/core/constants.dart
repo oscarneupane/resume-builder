@@ -37,7 +37,9 @@ enum AiFeature {
   bulletImprover,
   atsCheck,
   coverLetter,
+  linkedinHeadline,
   linkedinAbout,
+  recruiterMessage,
   interviewAnswer,
   skillsSuggest,
 }
