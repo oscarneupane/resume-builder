@@ -1,26 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'providers/resume_provider.dart';
-import 'screens/home_screen.dart';
-import 'theme/app_theme.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
-  runApp(const ResumeBuilderApp());
-}
+import 'app/app.dart';
+import 'services/supabase_service.dart';
 
-class ResumeBuilderApp extends StatelessWidget {
-  const ResumeBuilderApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ResumeProvider(),
-      child: MaterialApp(
-        title: 'Resume Builder',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        home: const HomeScreen(),
-      ),
-    );
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Load .env quietly — missing file is fine in dev (services fall back to mock).
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // No .env yet — services will run in mock mode.
   }
+  await SupabaseService.initialize();
+  runApp(const ProviderScope(child: ApplyMateApp()));
 }
