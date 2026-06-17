@@ -9,6 +9,8 @@ import '../../../app/theme.dart';
 import '../../../core/constants.dart';
 import '../../../core/extensions.dart';
 import '../../../services/ai_service.dart';
+import '../../../services/resume_repository.dart';
+import '../../../services/supabase_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/section_stepper.dart';
 import '../controllers/resume_builder_controller.dart';
@@ -25,8 +27,29 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
   int _step = 0;
   bool _summaryLoading = false;
   bool _skillsLoading = false;
+  bool _saving = false;
 
   static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Skills', 'Extras', 'Template'];
+
+  Future<void> _saveDraft(ResumeBuilderController c) async {
+    if (!SupabaseService.isConfigured) {
+      context.showSnack('Draft kept in memory (connect Supabase to save to the cloud).');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final id = await ResumeRepository.instance.saveResume(
+        c.toResume(),
+        existingId: c.savedResumeId,
+      );
+      if (id != null) c.savedResumeId = id;
+      if (mounted) context.showSnack('Draft saved');
+    } catch (e) {
+      if (mounted) context.showSnack('Save failed: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   Future<void> _generateSummary(ResumeBuilderController c) async {
     setState(() => _summaryLoading = true);
@@ -78,8 +101,8 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
         title: const Text('Resume Builder'),
         actions: [
           TextButton(
-            onPressed: () => context.showSnack('Draft kept in memory for this session'),
-            child: const Text('Save Draft'),
+            onPressed: _saving ? null : () => _saveDraft(c),
+            child: Text(_saving ? 'Saving…' : 'Save Draft'),
           ),
         ],
       ),

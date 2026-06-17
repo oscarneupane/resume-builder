@@ -1,0 +1,35 @@
+# Supabase CLI project config. `project_id` is a local label; it does not need to
+# match your remote project ref (you set that with `supabase link`).
+project_id = "applymate"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "applymate://"
+additional_redirect_urls = ["applymate://payment-success", "applymate://payment-cancelled"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# Stripe calls stripe-webhook without a Supabase JWT, so disable JWT verification
+# for that function. All others verify the caller's JWT in code.
+[functions.stripe-webhook]
+verify_jwt = false
