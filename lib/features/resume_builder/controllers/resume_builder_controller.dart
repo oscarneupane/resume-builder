@@ -85,6 +85,10 @@ class ResumeBuilderController extends ChangeNotifier {
 
   String template = AppConstants.defaultTemplate;
 
+  /// Set once the draft has been persisted to Supabase, so subsequent saves
+  /// update the same row instead of creating duplicates.
+  String? savedResumeId;
+
   void update(VoidCallback mutate) {
     mutate();
     notifyListeners();
