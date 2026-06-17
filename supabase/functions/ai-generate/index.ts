@@ -26,11 +26,13 @@ serve(async (req) => {
 
     // Normalize skillsSuggest to a bare JSON array string (the client parses a List).
     let result = content;
-    if (feature === 'skillsSuggest') {
+    // List-style features return a JSON object; unwrap to a bare array string.
+    if (feature === 'skillsSuggest' || feature === 'interviewQuestions') {
+      const key = feature === 'skillsSuggest' ? 'skills' : 'questions';
       try {
         const parsed = JSON.parse(content);
-        const skills = Array.isArray(parsed) ? parsed : (parsed.skills ?? []);
-        result = JSON.stringify(skills);
+        const list = Array.isArray(parsed) ? parsed : (parsed[key] ?? []);
+        result = JSON.stringify(list);
       } catch (_) {
         result = '[]';
       }

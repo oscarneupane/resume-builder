@@ -61,6 +61,17 @@ class CoverLetterController extends ChangeNotifier {
 
   bool get canGenerate => jobTitle.trim().isNotEmpty && companyName.trim().isNotEmpty;
 
+  /// Notify so the Generate button enables/disables live as the gating fields change.
+  void setJobTitle(String v) {
+    jobTitle = v;
+    notifyListeners();
+  }
+
+  void setCompanyName(String v) {
+    companyName = v;
+    notifyListeners();
+  }
+
   void setTone(CoverLetterTone t) {
     tone = t;
     notifyListeners();

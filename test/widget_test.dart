@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:applymate/core/constants.dart';
 import 'package:applymate/features/cover_letter/controllers/cover_letter_controller.dart';
+import 'package:applymate/features/interview_prep/controllers/interview_controller.dart';
 import 'package:applymate/features/linkedin_helper/controllers/linkedin_controller.dart';
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
 import 'package:applymate/models/resume_model.dart';
@@ -161,6 +162,19 @@ void main() {
       expect(LinkedInSection.about.feature, AiFeature.linkedinAbout);
       expect(LinkedInSection.recruiter.feature, AiFeature.recruiterMessage);
       expect(LinkedInSection.skills.feature, AiFeature.skillsSuggest);
+    });
+  });
+
+  group('InterviewController', () {
+    test('canGenerate requires a job title', () {
+      final c = InterviewController();
+      expect(c.canGenerate, isFalse);
+      c.jobTitle = 'Product Manager';
+      expect(c.canGenerate, isTrue);
+    });
+
+    test('starts with no questions', () {
+      expect(InterviewController().questions, isEmpty);
     });
   });
 

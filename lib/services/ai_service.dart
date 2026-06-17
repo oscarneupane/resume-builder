@@ -117,12 +117,13 @@ class AiService {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final content = (body['choices']?[0]?['message']?['content'] as String?)?.trim() ?? '';
 
-      // Normalize skillsSuggest to a bare JSON array string (the client parses a List).
-      if (feature == AiFeature.skillsSuggest) {
+      // Normalize list-style features to a bare JSON array string (client parses a List).
+      if (feature == AiFeature.skillsSuggest || feature == AiFeature.interviewQuestions) {
+        final key = feature == AiFeature.skillsSuggest ? 'skills' : 'questions';
         try {
           final parsed = jsonDecode(content);
-          final skills = parsed is List ? parsed : (parsed['skills'] ?? []);
-          return AiResult.ok(jsonEncode(skills));
+          final list = parsed is List ? parsed : (parsed[key] ?? []);
+          return AiResult.ok(jsonEncode(list));
         } catch (_) {
           return const AiResult.ok('[]');
         }
@@ -205,6 +206,14 @@ class AiService {
               'Polite, specific, and easy to reply to. Return only the message.',
           false
         );
+      case AiFeature.interviewQuestions:
+        return (
+          'Generate 10 realistic interview questions for a ${s('jobTitle')} role'
+              '${s('experienceLevel').isEmpty ? '' : ' (${s('experienceLevel')} level)'}.\n'
+              'Mix behavioral, technical, and role-specific.\n'
+              'Return a JSON object with a single key "questions" whose value is an array of 10 strings.',
+          true
+        );
       case AiFeature.interviewAnswer:
         return (
           'Generate a STAR-method interview answer.\n'
@@ -262,8 +271,24 @@ class AiService {
       case AiFeature.recruiterMessage:
         return 'Hi {recruiter}, I came across the {role} opening and it lines up well with my '
             'experience in {skills}. I would love to learn more — open to a quick chat this week?';
+      case AiFeature.interviewQuestions:
+        return jsonEncode([
+          'Tell me about yourself and your background.',
+          'Why are you interested in this role?',
+          'Describe a challenging project and how you handled it.',
+          'How do you prioritise competing deadlines?',
+          'Tell me about a time you disagreed with a teammate.',
+          'What is your greatest professional achievement?',
+          'How do you stay current in your field?',
+          'Describe a time you failed and what you learned.',
+          'How do you handle feedback?',
+          'Where do you see yourself in five years?',
+        ]);
       case AiFeature.interviewAnswer:
-        return 'Situation: ...\nTask: ...\nAction: ...\nResult: ...';
+        return 'Situation: Briefly set the context.\n'
+            'Task: What you needed to achieve.\n'
+            'Action: The specific steps you took.\n'
+            'Result: The measurable outcome.';
       case AiFeature.skillsSuggest:
         return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability']);
     }
