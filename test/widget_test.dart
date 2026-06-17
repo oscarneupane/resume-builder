@@ -5,7 +5,9 @@ import 'package:applymate/features/cover_letter/controllers/cover_letter_control
 import 'package:applymate/features/interview_prep/controllers/interview_controller.dart';
 import 'package:applymate/features/linkedin_helper/controllers/linkedin_controller.dart';
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
+import 'package:applymate/models/job_application_model.dart';
 import 'package:applymate/models/resume_model.dart';
+import 'package:applymate/services/job_repository.dart';
 import 'package:applymate/shared/utils/validators.dart';
 
 void main() {
@@ -175,6 +177,42 @@ void main() {
 
     test('starts with no questions', () {
       expect(InterviewController().questions, isEmpty);
+    });
+  });
+
+  group('JobApplication', () {
+    test('status parse + label round-trip', () {
+      for (final s in JobStatus.values) {
+        expect(JobStatus.parse(s.value), s);
+        expect(s.label, isNotEmpty);
+      }
+    });
+
+    test('copyWith changes only the given fields', () {
+      final base = JobApplication(
+        id: '1', userId: 'u', companyName: 'Acme', jobTitle: 'Eng',
+        applicationDate: DateTime(2026), status: JobStatus.saved,
+      );
+      final moved = base.copyWith(status: JobStatus.interview);
+      expect(moved.status, JobStatus.interview);
+      expect(moved.companyName, 'Acme');
+      expect(moved.id, '1');
+    });
+  });
+
+  group('JobRepository (mock mode)', () {
+    test('create → list → updateStatus → delete lifecycle', () async {
+      final repo = JobRepository.instance;
+      final job = await repo.create(
+        companyName: 'Acme', jobTitle: 'Engineer', status: JobStatus.saved);
+      expect((await repo.list()).any((j) => j.id == job.id), isTrue);
+
+      await repo.updateStatus(job.id, JobStatus.applied);
+      final afterMove = (await repo.list()).firstWhere((j) => j.id == job.id);
+      expect(afterMove.status, JobStatus.applied);
+
+      await repo.delete(job.id);
+      expect((await repo.list()).any((j) => j.id == job.id), isFalse);
     });
   });
 
