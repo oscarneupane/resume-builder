@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
+import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../controllers/resume_builder_controller.dart';
@@ -13,35 +14,56 @@ import '../controllers/resume_builder_controller.dart';
 // field re-seeds its initialValue from the model, which already holds the
 // latest typed text. This keeps typing smooth and the model consistent.
 
-/// Step 0 — Personal info.
+/// Step 0 — Personal info. Required fields (name, email, phone, location) are
+/// validated via [formKey], which the screen calls before advancing.
 class PersonalStep extends StatelessWidget {
   final ResumeBuilderController c;
-  const PersonalStep(this.c, {super.key});
+  final GlobalKey<FormState> formKey;
+  const PersonalStep(this.c, {super.key, required this.formKey});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AppTextField(label: 'Full name', initialValue: c.fullName, onChanged: (v) => c.fullName = v),
-        const SizedBox(height: 12),
-        AppTextField(label: 'Professional title', initialValue: c.title, onChanged: (v) => c.title = v),
-        const SizedBox(height: 12),
-        AppTextField(
-            label: 'Email',
+    return Form(
+      key: formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        children: [
+          AppTextField(
+            label: 'Full name *',
+            initialValue: c.fullName,
+            onChanged: (v) => c.fullName = v,
+            validator: (v) => Validators.required(v, 'Full name'),
+          ),
+          const SizedBox(height: 12),
+          AppTextField(label: 'Professional title', initialValue: c.title, onChanged: (v) => c.title = v),
+          const SizedBox(height: 12),
+          AppTextField(
+            label: 'Email *',
             keyboardType: TextInputType.emailAddress,
             initialValue: c.email,
-            onChanged: (v) => c.email = v),
-        const SizedBox(height: 12),
-        AppTextField(
-            label: 'Phone',
+            onChanged: (v) => c.email = v,
+            validator: Validators.email,
+          ),
+          const SizedBox(height: 12),
+          AppTextField(
+            label: 'Phone *',
             keyboardType: TextInputType.phone,
             initialValue: c.phone,
-            onChanged: (v) => c.phone = v),
-        const SizedBox(height: 12),
-        AppTextField(label: 'Location', initialValue: c.location, onChanged: (v) => c.location = v),
-        const SizedBox(height: 12),
-        AppTextField(label: 'LinkedIn URL', initialValue: c.linkedin, onChanged: (v) => c.linkedin = v),
-      ],
+            onChanged: (v) => c.phone = v,
+            validator: Validators.phone,
+          ),
+          const SizedBox(height: 12),
+          AppTextField(
+            label: 'Location / address *',
+            hint: 'City, Country',
+            initialValue: c.location,
+            onChanged: (v) => c.location = v,
+            validator: (v) => Validators.required(v, 'Location'),
+          ),
+          const SizedBox(height: 12),
+          AppTextField(label: 'LinkedIn URL', initialValue: c.linkedin, onChanged: (v) => c.linkedin = v),
+        ],
+      ),
     );
   }
 }

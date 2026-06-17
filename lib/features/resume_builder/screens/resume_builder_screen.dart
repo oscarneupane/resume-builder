@@ -28,6 +28,7 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
   bool _summaryLoading = false;
   bool _skillsLoading = false;
   bool _saving = false;
+  final _personalFormKey = GlobalKey<FormState>();
 
   static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Skills', 'Extras', 'Template'];
 
@@ -68,6 +69,22 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
       c.update(() => c.summary = res.text!.trim());
     } else {
       context.showSnack(res.error ?? 'Could not generate summary.');
+    }
+  }
+
+  void _onNext() {
+    // Step 0 (Personal) gates on required fields.
+    if (_step == 0) {
+      final ok = _personalFormKey.currentState?.validate() ?? true;
+      if (!ok) {
+        context.showSnack('Please complete the required fields.');
+        return;
+      }
+    }
+    if (_step == _stepNames.length - 1) {
+      context.push(AppRoutes.resumePreview);
+    } else {
+      setState(() => _step++);
     }
   }
 
@@ -155,13 +172,7 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
                   Expanded(
                     child: AppButton(
                       label: _step == _stepNames.length - 1 ? 'Preview Resume' : 'Next',
-                      onPressed: () {
-                        if (_step == _stepNames.length - 1) {
-                          context.push(AppRoutes.resumePreview);
-                        } else {
-                          setState(() => _step++);
-                        }
-                      },
+                      onPressed: () => _onNext(),
                     ),
                   ),
                 ],
@@ -176,7 +187,7 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
   Widget _buildStep(ResumeBuilderController c) {
     switch (_step) {
       case 0:
-        return PersonalStep(c);
+        return PersonalStep(c, formKey: _personalFormKey);
       case 1:
         return SummaryStep(c, onAiGenerate: () => _generateSummary(c), aiLoading: _summaryLoading);
       case 2:

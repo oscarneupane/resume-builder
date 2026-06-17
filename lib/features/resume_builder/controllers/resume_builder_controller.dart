@@ -156,6 +156,48 @@ class ResumeBuilderController extends ChangeNotifier {
     return done / total;
   }
 
+  /// Weighted 0-100 measure of how strong/complete the resume is — the
+  /// "potential" shown on the dashboard. Rewards depth (quantified bullets,
+  /// enough skills, a substantive summary), not just presence of a field.
+  int get strengthScore {
+    var score = 0;
+
+    // Contact essentials — 20 (4 each).
+    if (fullName.trim().isNotEmpty) score += 4;
+    if (email.trim().isNotEmpty) score += 4;
+    if (phone.trim().isNotEmpty) score += 4;
+    if (location.trim().isNotEmpty) score += 4;
+    if (title.trim().isNotEmpty) score += 4;
+
+    // Summary — 15 (presence + substance).
+    final summaryLen = summary.trim().length;
+    if (summaryLen > 0) score += 8;
+    if (summaryLen >= 120) score += 7;
+
+    // Experience — 24 (an entry + quantified-ish bullets).
+    final filledExp = experiences.where((e) => e.title.trim().isNotEmpty && e.company.trim().isNotEmpty);
+    if (filledExp.isNotEmpty) score += 12;
+    final bulletCount = filledExp.fold<int>(0, (n, e) => n + e.bullets.where((b) => b.trim().isNotEmpty).length);
+    if (bulletCount >= 1) score += 6;
+    if (bulletCount >= 3) score += 6;
+
+    // Education — 12.
+    if (education.any((e) => e.degree.trim().isNotEmpty && e.school.trim().isNotEmpty)) score += 12;
+
+    // Skills — 16 (depth).
+    if (skills.length >= 3) score += 10;
+    if (skills.length >= 6) score += 6;
+
+    // Extras — 8.
+    if (certifications.isNotEmpty) score += 4;
+    if (languages.isNotEmpty) score += 4;
+
+    // LinkedIn — 5 bonus.
+    if (linkedin.trim().isNotEmpty) score += 5;
+
+    return score.clamp(0, 100);
+  }
+
   /// Builds an in-memory [Resume] shaped for [PdfService] and (later) Supabase.
   Resume toResume({String userId = 'local', String id = 'draft'}) {
     ResumeSection sec(SectionType type, Map<String, dynamic> content, int order) => ResumeSection(
