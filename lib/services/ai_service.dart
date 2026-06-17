@@ -1,174 +1,107 @@
 import 'dart:convert';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import '../models/resume_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Talks to YOUR backend (not the AI provider directly!) for two things:
-///  1. Improving a single resume bullet point.
-///  2. Parsing + improving a whole pasted-in resume into structured fields.
+import '../core/constants.dart';
+import 'supabase_service.dart';
+
+/// Calls the Supabase Edge Function `ai-generate` (Part G3).
 ///
-/// SECURITY NOTE: never call an AI API directly from a shipped mobile app
-/// with a hard-coded API key — anyone can decompile the APK/IPA and pull
-/// the key straight out of the binary. The fix is a tiny backend (Node +
-/// Express, a Cloudflare Worker, or a Firebase Cloud Function) that holds
-/// the key server-side and exposes the endpoints below. Point the URLs at
-/// it once it exists.
+/// CRITICAL: never embed OpenAI keys here. We hit our Edge Function, which
+/// holds the key in env vars and enforces rate limiting.
 ///
-/// Until that backend is built, this falls back to simple local mocks so
-/// you can test the rest of the app end-to-end right away.
-class AIService {
-  static const String _improveUrl = 'https://YOUR-BACKEND-URL/improve-bullet';
-  static const String _parseUrl = 'https://YOUR-BACKEND-URL/parse-resume';
+/// If Supabase isn't configured yet, we return a deterministic placeholder so
+/// the UI flows are exercisable in dev.
+class AiService {
+  AiService._();
+  static final instance = AiService._();
 
-  // Flip to false once your backend is live.
-  static const bool _useMockFallback = true;
-
-  /// Improves a single bullet point. [targetField], [targetJobTitle] and
-  /// [priorities] come from the Goals step and let the AI tailor the
-  /// rewrite (e.g. emphasize "Leadership" vs "Technical skills") instead of
-  /// giving generic advice.
-  Future<String> improveBulletPoint({
-    required String original,
-    String? role,
-    String? company,
-    String? targetField,
-    String? targetJobTitle,
-    List<String>? priorities,
+  Future<AiResult> generate({
+    required AiFeature feature,
+    required Map<String, dynamic> context,
   }) async {
-    if (_useMockFallback) {
-      await Future.delayed(const Duration(milliseconds: 600)); // simulate latency
-      return _mockImprove(original);
+    if (!SupabaseService.isConfigured) {
+      return AiResult.ok(_mockResponse(feature, context));
     }
 
-    final response = await http
-        .post(
-          Uri.parse(_improveUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'bullet': original,
-            'role': role,
-            'company': company,
-            'targetField': targetField,
-            'targetJobTitle': targetJobTitle,
-            'priorities': priorities,
-          }),
-        )
-        .timeout(const Duration(seconds: 20));
-
-    if (response.statusCode != 200) {
-      throw Exception('AI service returned ${response.statusCode}');
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      return const AiResult.failure('Not signed in.');
     }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return data['improved'] as String;
-  }
+    final url = dotenv.env['SUPABASE_URL'];
+    final endpoint = Uri.parse('$url/functions/v1/${AppConstants.fnAiGenerate}');
 
-  /// Sends a pasted-in resume's raw text to AI and gets back structured,
-  /// improved fields ready to drop into ResumeData.
-  ///
-  /// EXPECTED BACKEND RESPONSE SHAPE (your backend's job is to prompt the
-  /// AI to return exactly this JSON):
-  /// {
-  ///   "personalInfo": {"fullName": "", "email": "", "phone": "",
-  ///                     "location": "", "linkedIn": "", "summary": ""},
-  ///   "education": [{"institution": "", "degree": "", "fieldOfStudy": "",
-  ///                   "startDate": "", "endDate": ""}],
-  ///   "experience": [{"company": "", "role": "", "location": "",
-  ///                    "startDate": "", "endDate": "", "bullets": [""]}],
-  ///   "skills": [""]
-  /// }
-  Future<ResumeData> parseResume(String rawText) async {
-    if (_useMockFallback) {
-      await Future.delayed(const Duration(milliseconds: 900));
-      return _mockParseResume(rawText);
-    }
+    final res = await http.post(
+      endpoint,
+      headers: {
+        'Authorization': 'Bearer ${session.accessToken}',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'feature': feature.name, 'context': context}),
+    );
 
-    final response = await http
-        .post(
-          Uri.parse(_parseUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'resumeText': rawText}),
-        )
-        .timeout(const Duration(seconds: 30));
-
-    if (response.statusCode != 200) {
-      throw Exception('Resume parsing failed (${response.statusCode})');
-    }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return _resumeDataFromJson(json);
-  }
-
-  ResumeData _resumeDataFromJson(Map<String, dynamic> json) {
-    final data = ResumeData();
-    final pi = (json['personalInfo'] as Map?)?.cast<String, dynamic>() ?? {};
-    data.personalInfo
-      ..fullName = (pi['fullName'] ?? '').toString()
-      ..email = (pi['email'] ?? '').toString()
-      ..phone = (pi['phone'] ?? '').toString()
-      ..location = (pi['location'] ?? '').toString()
-      ..linkedIn = (pi['linkedIn'] ?? '').toString()
-      ..summary = (pi['summary'] ?? '').toString();
-
-    data.education = (json['education'] as List? ?? []).map((e) {
-      final m = (e as Map).cast<String, dynamic>();
-      return Education(
-        institution: (m['institution'] ?? '').toString(),
-        degree: (m['degree'] ?? '').toString(),
-        fieldOfStudy: (m['fieldOfStudy'] ?? '').toString(),
-        startDate: (m['startDate'] ?? '').toString(),
-        endDate: (m['endDate'] ?? '').toString(),
+    if (res.statusCode == 429) {
+      return const AiResult.failure(
+        'Free plan limit reached (3/week). Upgrade to Pro for unlimited.',
+        rateLimited: true,
       );
-    }).toList();
-
-    data.experience = (json['experience'] as List? ?? []).map((e) {
-      final m = (e as Map).cast<String, dynamic>();
-      return Experience(
-        company: (m['company'] ?? '').toString(),
-        role: (m['role'] ?? '').toString(),
-        location: (m['location'] ?? '').toString(),
-        startDate: (m['startDate'] ?? '').toString(),
-        endDate: (m['endDate'] ?? '').toString(),
-        bullets: (m['bullets'] as List? ?? ['']).map((b) => b.toString()).toList(),
-      );
-    }).toList();
-
-    data.skills = (json['skills'] as List? ?? []).map((s) => s.toString()).toList();
-
-    return data;
+    }
+    if (res.statusCode >= 400) {
+      return AiResult.failure('AI request failed (${res.statusCode})');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return AiResult.ok((body['result'] as String?) ?? '');
   }
 
-  /// Placeholder "improvement" so the UX can be demoed before a real AI
-  /// backend is wired up. Replace by setting _useMockFallback = false above.
-  String _mockImprove(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return trimmed;
-    final capitalized = trimmed[0].toUpperCase() + trimmed.substring(1);
-    final endsWithPunctuation = capitalized.endsWith('.') || capitalized.endsWith('!');
-    return '$capitalized${endsWithPunctuation ? '' : '.'} (AI-enhanced — connect a real backend for genuine rewrites)';
+  String _mockResponse(AiFeature feature, Map<String, dynamic> ctx) {
+    switch (feature) {
+      case AiFeature.professionalSummary:
+        final title = ctx['jobTitle'] ?? 'professional';
+        return 'Results-driven $title with a track record of delivering measurable impact. '
+            'Skilled at collaborating across teams, simplifying complex problems, and shipping '
+            'production-quality work. Eager to bring strong technical fundamentals and a growth '
+            'mindset to a high-performing team.';
+      case AiFeature.bulletImprover:
+        final original = (ctx['bullet'] ?? '').toString();
+        return original.isEmpty
+            ? 'Spearheaded a cross-functional initiative that reduced cycle time by 28% in one quarter.'
+            : 'Improved: $original — now with stronger action verb and quantified result (e.g. 25%).';
+      case AiFeature.atsCheck:
+        return jsonEncode({
+          'score': 72,
+          'matching_keywords': ['flutter', 'rest api', 'agile'],
+          'missing_keywords': ['kubernetes', 'graphql'],
+          'weak_sections': ['summary'],
+          'suggestions': [
+            {'section': 'summary', 'issue': 'Too generic', 'fix': 'Lead with role + years of experience.'}
+          ]
+        });
+      case AiFeature.coverLetter:
+        return jsonEncode({
+          'full_letter': 'Dear Hiring Manager,\n\n[Generated cover letter draft]\n\nSincerely,',
+          'short_email': 'Hi — quick note to express interest in the role...',
+          'recruiter_msg': 'Hi {recruiter}, saw the role — would love to chat.',
+        });
+      case AiFeature.linkedinAbout:
+        return 'Builder, learner, shipper. I help teams turn ambiguous problems into clear plans...';
+      case AiFeature.interviewAnswer:
+        return 'Situation: ...\nTask: ...\nAction: ...\nResult: ...';
+      case AiFeature.skillsSuggest:
+        return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability']);
+    }
   }
+}
 
-  /// Best-effort placeholder parsing so the import flow is testable before
-  /// a real backend exists. It can pull out an email/phone with regex and
-  /// guesses the name is the first line, but it can't reliably split
-  /// experience/education/skills without real AI — that content goes into
-  /// a single "Imported content" entry for you to split manually for now.
-  ResumeData _mockParseResume(String rawText) {
-    final emailMatch = RegExp(r'[\w\.\-]+@[\w\.\-]+\.\w+').firstMatch(rawText);
-    final phoneMatch = RegExp(r'(\+?\d[\d \-\(\)]{7,}\d)').firstMatch(rawText);
-    final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-    final guessedName = lines.isNotEmpty ? lines.first : '';
+class AiResult {
+  final String? text;
+  final String? error;
+  final bool rateLimited;
 
-    final data = ResumeData();
-    data.personalInfo.fullName = guessedName;
-    data.personalInfo.email = emailMatch?.group(0) ?? '';
-    data.personalInfo.phone = phoneMatch?.group(0) ?? '';
-    data.personalInfo.summary = 'Pasted resume detected (${lines.length} lines). Connect a real AI '
-        'backend to automatically split this into Experience, Education, and Skills — for now '
-        'it\'s dropped into the experience section below so nothing is lost; edit it manually '
-        'on the next screens.';
-    data.experience.add(Experience(
-      role: 'Imported content (edit or delete me)',
-      bullets: [rawText.length > 600 ? '${rawText.substring(0, 600)}...' : rawText],
-    ));
-    return data;
-  }
+  const AiResult._(this.text, this.error, this.rateLimited);
+  const AiResult.ok(String text) : this._(text, null, false);
+  const AiResult.failure(String error, {bool rateLimited = false}) : this._(null, error, rateLimited);
+
+  bool get isOk => error == null;
 }

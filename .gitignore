@@ -9,3 +9,12 @@ android/.gradle/
 android/local.properties
 ios/Pods/
 ios/.symlinks/
+
+# ApplyMate
+.env
+android/key.properties
+android/app/*.jks
+
+# Stray IntelliJ Java project accidentally created inside the repo (not part of the app)
+ApplyMate/
+
