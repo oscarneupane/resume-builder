@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:applymate/core/constants.dart';
 import 'package:applymate/features/cover_letter/controllers/cover_letter_controller.dart';
+import 'package:applymate/features/linkedin_helper/controllers/linkedin_controller.dart';
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
 import 'package:applymate/models/resume_model.dart';
 import 'package:applymate/shared/utils/validators.dart';
@@ -147,6 +148,22 @@ void main() {
     });
   });
 
+  group('LinkedInController', () {
+    test('canGenerate requires a job title', () {
+      final c = LinkedInController();
+      expect(c.canGenerate, isFalse);
+      c.jobTitle = 'Engineer';
+      expect(c.canGenerate, isTrue);
+    });
+
+    test('each section maps to the right AI feature', () {
+      expect(LinkedInSection.headline.feature, AiFeature.linkedinHeadline);
+      expect(LinkedInSection.about.feature, AiFeature.linkedinAbout);
+      expect(LinkedInSection.recruiter.feature, AiFeature.recruiterMessage);
+      expect(LinkedInSection.skills.feature, AiFeature.skillsSuggest);
+    });
+  });
+
   group('Validators', () {
     test('email validation', () {
       expect(Validators.email('bad'), isNotNull);
@@ -164,6 +181,15 @@ void main() {
       expect(Validators.phone('123'), isNotNull); // too short
       expect(Validators.phone('0412 345 678'), isNull);
       expect(Validators.phone('+61 (412) 345-678'), isNull);
+    });
+
+    test('username validation', () {
+      expect(Validators.username(''), isNotNull);
+      expect(Validators.username('ab'), isNotNull); // too short
+      expect(Validators.username('has space'), isNotNull);
+      expect(Validators.username('bad!char'), isNotNull);
+      expect(Validators.username('ada_lovelace'), isNull);
+      expect(Validators.username('user.123-x'), isNull);
     });
   });
 }

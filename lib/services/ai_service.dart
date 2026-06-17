@@ -181,12 +181,28 @@ class AiService {
               'Return a JSON object with keys: full_letter, short_email, recruiter_msg.',
           true
         );
+      case AiFeature.linkedinHeadline:
+        return (
+          'Write 3 punchy LinkedIn headline options (max 120 chars each) for a '
+              '${s('jobTitle')} with ${s('yearsExp')} years of experience.\n'
+              'Skills: ${s('skills')}\n'
+              'Return each headline on its own line, no numbering or quotes.',
+          false
+        );
       case AiFeature.linkedinAbout:
         return (
           'Write a compelling LinkedIn About section.\n'
               'Name: ${s('name')} | Job Title: ${s('jobTitle')}\n'
               'Skills: ${s('skills')} | Career Goal: ${s('goal')}\n'
               'Max 300 words. Professional tone. First person.',
+          false
+        );
+      case AiFeature.recruiterMessage:
+        return (
+          'Write a short, friendly cold outreach message to a recruiter (max 90 '
+              'words) from a ${s('jobTitle')} with ${s('yearsExp')} years of experience.\n'
+              'Skills: ${s('skills')}\n'
+              'Polite, specific, and easy to reply to. Return only the message.',
           false
         );
       case AiFeature.interviewAnswer:
@@ -237,8 +253,15 @@ class AiService {
           'short_email': 'Hi — quick note to express interest in the role...',
           'recruiter_msg': 'Hi {recruiter}, saw the role — would love to chat.',
         });
+      case AiFeature.linkedinHeadline:
+        return 'Software Engineer | Flutter & Dart | Building delightful mobile apps\n'
+            'Mobile Developer turning ideas into shipped products\n'
+            'Engineer • Problem solver • Lifelong learner';
       case AiFeature.linkedinAbout:
         return 'Builder, learner, shipper. I help teams turn ambiguous problems into clear plans...';
+      case AiFeature.recruiterMessage:
+        return 'Hi {recruiter}, I came across the {role} opening and it lines up well with my '
+            'experience in {skills}. I would love to learn more — open to a quick chat this week?';
       case AiFeature.interviewAnswer:
         return 'Situation: ...\nTask: ...\nAction: ...\nResult: ...';
       case AiFeature.skillsSuggest:

@@ -21,9 +21,20 @@ port = 54323
 [auth]
 enabled = true
 site_url = "applymate://"
-additional_redirect_urls = ["applymate://payment-success", "applymate://payment-cancelled"]
+additional_redirect_urls = [
+  "applymate://login-callback",
+  "applymate://payment-success",
+  "applymate://payment-cancelled",
+]
 jwt_expiry = 3600
 enable_signup = true
+
+# Google OAuth ("Continue with Google"). Set the client id/secret as env vars
+# (or in the Supabase dashboard → Authentication → Providers → Google).
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
 
 [auth.email]
 enable_signup = true

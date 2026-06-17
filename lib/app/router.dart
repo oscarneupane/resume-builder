@@ -77,11 +77,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final atAuth = const {AppRoutes.login, AppRoutes.signup, AppRoutes.forgot}.contains(loc);
       final atOnboarding = loc == AppRoutes.onboarding;
 
-      // Not signed in: route through onboarding (if not seen) → login
+      // Not signed in: only auth/onboarding screens are reachable. Anything else
+      // (e.g. logging out from a deep screen) redirects back to login/onboarding.
       if (!auth.isSignedIn) {
-        if (!hasOnboarded && !atOnboarding && !atAuth) return AppRoutes.onboarding;
-        if (hasOnboarded && (atSplash || atOnboarding)) return AppRoutes.login;
-        return null;
+        if (!hasOnboarded) return atOnboarding ? null : AppRoutes.onboarding;
+        return atAuth ? null : AppRoutes.login;
       }
 
       // Signed in → dashboard (don't sit on auth/splash)

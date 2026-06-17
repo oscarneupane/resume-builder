@@ -78,6 +78,26 @@ supabase secrets set \
    `customer.subscription.deleted`, `invoice.payment_failed`. Copy the **signing
    secret** into `STRIPE_WEBHOOK_SECRET`.
 
+## Google sign-in ("Continue with Google")
+
+The app calls `signInWithOAuth(Google, redirectTo: applymate://login-callback)`.
+To make it work live:
+
+1. **Google Cloud** → create an OAuth 2.0 Client ID (type: Web application).
+   - Authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`
+   - Copy the **Client ID** and **Client secret**.
+2. **Supabase** → Authentication → Providers → **Google**: enable it and paste the
+   Client ID + secret. (Or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` env vars
+   for the CLI — see `config.toml`.)
+3. **Supabase** → Authentication → URL Configuration → add `applymate://login-callback`
+   to the allowed redirect URLs (already in `config.toml`).
+4. **Android** is already wired: the manifest registers the
+   `applymate://login-callback` deep link so the browser returns to the app, and
+   `supabase_flutter` (PKCE) picks up the session automatically.
+
+Until this is configured, the "Continue with Google" button shows a message
+explaining setup is required (mock mode can't do real OAuth).
+
 ## Point the Flutter app at the backend
 
 Fill `.env` in the repo root (copy from `.env.example`). Real (non-`your-…`)

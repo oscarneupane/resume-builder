@@ -3,6 +3,7 @@ import '../core/constants.dart';
 class Profile {
   final String id;
   final String? fullName;
+  final String? username;
   final String? avatarUrl;
   final String? careerGoal;
   final String? jobTitle;
@@ -15,6 +16,7 @@ class Profile {
   const Profile({
     required this.id,
     this.fullName,
+    this.username,
     this.avatarUrl,
     this.careerGoal,
     this.jobTitle,
@@ -28,6 +30,7 @@ class Profile {
   factory Profile.fromMap(Map<String, dynamic> m) => Profile(
         id: m['id'] as String,
         fullName: m['full_name'] as String?,
+        username: m['username'] as String?,
         avatarUrl: m['avatar_url'] as String?,
         careerGoal: m['career_goal'] as String?,
         jobTitle: m['job_title'] as String?,
@@ -41,6 +44,7 @@ class Profile {
   Map<String, dynamic> toMap() => {
         'id': id,
         if (fullName != null) 'full_name': fullName,
+        if (username != null) 'username': username,
         if (avatarUrl != null) 'avatar_url': avatarUrl,
         if (careerGoal != null) 'career_goal': careerGoal,
         if (jobTitle != null) 'job_title': jobTitle,
@@ -51,6 +55,7 @@ class Profile {
 
   Profile copyWith({
     String? fullName,
+    String? username,
     String? avatarUrl,
     String? careerGoal,
     String? jobTitle,
@@ -61,6 +66,7 @@ class Profile {
       Profile(
         id: id,
         fullName: fullName ?? this.fullName,
+        username: username ?? this.username,
         avatarUrl: avatarUrl ?? this.avatarUrl,
         careerGoal: careerGoal ?? this.careerGoal,
         jobTitle: jobTitle ?? this.jobTitle,
