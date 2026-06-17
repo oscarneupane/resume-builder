@@ -23,6 +23,18 @@ class Validators {
     return null;
   }
 
+  /// Username: required, 3-20 chars, letters/numbers/._- only.
+  static String? username(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Username is required';
+    final t = v.trim();
+    if (t.length < 3) return 'At least 3 characters';
+    if (t.length > 20) return 'At most 20 characters';
+    if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(t)) {
+      return 'Use letters, numbers, . _ - only';
+    }
+    return null;
+  }
+
   /// Phone: required, allows digits, spaces, and +()- separators; needs >= 7 digits.
   static String? phone(String? v) {
     if (v == null || v.trim().isEmpty) return 'Phone number is required';

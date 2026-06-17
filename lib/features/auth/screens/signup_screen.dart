@@ -9,6 +9,7 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../auth_provider.dart';
+import '../widgets/google_sign_in_button.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -20,6 +21,7 @@ class SignupScreen extends ConsumerStatefulWidget {
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -30,6 +32,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _usernameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
@@ -44,6 +47,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             email: _emailCtrl.text.trim(),
             password: _passwordCtrl.text,
             fullName: _nameCtrl.text.trim(),
+            username: _usernameCtrl.text.trim(),
           );
     } catch (e) {
       if (mounted) context.showSnack(e.toString());
@@ -79,6 +83,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 14),
                 AppTextField(
+                  label: 'Username',
+                  hint: 'How you’ll appear in ApplyMate',
+                  controller: _usernameCtrl,
+                  textInputAction: TextInputAction.next,
+                  validator: Validators.username,
+                ),
+                const SizedBox(height: 14),
+                AppTextField(
                   label: 'Email address',
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
@@ -110,6 +122,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 20),
                 AppButton(label: 'Create account', onPressed: _submit, loading: _loading),
+                const SizedBox(height: 20),
+                const GoogleSignInButton(),
                 const SizedBox(height: 16),
                 Center(
                   child: Wrap(

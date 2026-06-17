@@ -10,6 +10,7 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../auth_provider.dart';
+import '../widgets/google_sign_in_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -92,6 +93,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       AppButton(label: 'Log in', onPressed: _submit, loading: _loading),
+                      const SizedBox(height: 20),
+                      const GoogleSignInButton(),
                       const SizedBox(height: 16),
                       Center(
                         child: Wrap(

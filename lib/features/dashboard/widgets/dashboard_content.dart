@@ -14,8 +14,7 @@ class DashboardContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final email = ref.watch(authStateProvider).email;
-    final greetingName = (email?.split('@').first ?? 'friend').capitalized;
+    final greetingName = ref.watch(authStateProvider).displayName.capitalized;
     // Live resume "potential" — reflects how complete/strong the user's draft is.
     final resumeScore = ref.watch(resumeBuilderControllerProvider).strengthScore;
 

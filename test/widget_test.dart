@@ -165,5 +165,14 @@ void main() {
       expect(Validators.phone('0412 345 678'), isNull);
       expect(Validators.phone('+61 (412) 345-678'), isNull);
     });
+
+    test('username validation', () {
+      expect(Validators.username(''), isNotNull);
+      expect(Validators.username('ab'), isNotNull); // too short
+      expect(Validators.username('has space'), isNotNull);
+      expect(Validators.username('bad!char'), isNotNull);
+      expect(Validators.username('ada_lovelace'), isNull);
+      expect(Validators.username('user.123-x'), isNull);
+    });
   });
 }

@@ -8,38 +8,48 @@ import 'supabase_service.dart';
 
 /// Auth surface used by the auth controller / router.
 ///
-/// Real path: Supabase Auth (email/password). Fallback path: local-only mock
-/// session persisted in flutter_secure_storage so the app runs end-to-end
+/// Real path: Supabase Auth (email/password + Google OAuth). Fallback path:
+/// local-only mock session in flutter_secure_storage so the app runs end-to-end
 /// before infra exists. Both paths expose the same `authStateChanges`.
 class AuthRepository {
   AuthRepository._();
   static final instance = AuthRepository._();
 
-  static const _mockKey = 'mock_user_email';
+  static const _mockEmailKey = 'mock_user_email';
+  static const _mockUsernameKey = 'mock_user_username';
   final _storage = const FlutterSecureStorage();
   final _mockController = StreamController<AuthEvent>.broadcast();
 
   String? _mockUserId;
   String? _mockEmail;
+  String? _mockUsername;
+
+  /// Deep link Supabase redirects back to after the Google OAuth browser flow.
+  /// Must be registered in AndroidManifest and in Supabase's allowed redirects.
+  static const _oauthRedirect = 'applymate://login-callback';
 
   Stream<AuthEvent> get authStateChanges {
     if (SupabaseService.isConfigured) {
-      return SupabaseService.instance.client.auth.onAuthStateChange
-          .map((e) => AuthEvent(
-                userId: e.session?.user.id,
-                email: e.session?.user.email,
-              ));
+      return SupabaseService.instance.client.auth.onAuthStateChange.map((e) {
+        final user = e.session?.user;
+        return AuthEvent(
+          userId: user?.id,
+          email: user?.email,
+          username: user?.userMetadata?['username'] as String?,
+        );
+      });
     }
     return _mockController.stream;
   }
 
   Future<void> restoreSession() async {
     if (SupabaseService.isConfigured) return; // Supabase restores via its own persistence
-    final email = await _storage.read(key: _mockKey);
+    final email = await _storage.read(key: _mockEmailKey);
     if (email != null) {
       _mockEmail = email;
+      _mockUsername = await _storage.read(key: _mockUsernameKey);
       _mockUserId = 'mock-${email.hashCode.toUnsigned(32)}';
-      _mockController.add(AuthEvent(userId: _mockUserId, email: email));
+      _mockController.add(AuthEvent(userId: _mockUserId, email: email, username: _mockUsername));
     }
   }
 
@@ -57,21 +67,36 @@ class AuthRepository {
     return _mockEmail;
   }
 
+  String? get currentUsername {
+    if (SupabaseService.isConfigured) {
+      return SupabaseService.instance.client.auth.currentUser?.userMetadata?['username'] as String?;
+    }
+    return _mockUsername;
+  }
+
   bool get isSignedIn => currentUserId != null;
 
-  Future<void> signUp({required String email, required String password, String? fullName}) async {
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? fullName,
+    String? username,
+  }) async {
     if (SupabaseService.isConfigured) {
       final res = await SupabaseService.instance.client.auth.signUp(
         email: email,
         password: password,
-        data: {if (fullName != null) 'full_name': fullName},
+        data: {
+          if (fullName != null) 'full_name': fullName,
+          if (username != null) 'username': username,
+        },
       );
       if (res.user == null) {
         throw const AuthFailure('Sign up failed. Try again.');
       }
       return;
     }
-    await _mockSignIn(email);
+    await _mockSignIn(email, username: username);
   }
 
   Future<void> signIn({required String email, required String password}) async {
@@ -86,15 +111,35 @@ class AuthRepository {
     await _mockSignIn(email);
   }
 
+  /// Google sign-in via Supabase OAuth. The resulting session arrives through
+  /// [authStateChanges] once the browser redirects back to [_oauthRedirect].
+  Future<void> signInWithGoogle() async {
+    if (!SupabaseService.isConfigured) {
+      throw const AuthFailure(
+        'Google sign-in needs Supabase + the Google provider enabled. See supabase/README.md.',
+      );
+    }
+    try {
+      await SupabaseService.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: _oauthRedirect,
+      );
+    } on AuthException catch (e) {
+      throw AuthFailure(e.message);
+    }
+  }
+
   Future<void> signOut() async {
     if (SupabaseService.isConfigured) {
       await SupabaseService.instance.client.auth.signOut();
       return;
     }
-    await _storage.delete(key: _mockKey);
+    await _storage.delete(key: _mockEmailKey);
+    await _storage.delete(key: _mockUsernameKey);
     _mockUserId = null;
     _mockEmail = null;
-    _mockController.add(const AuthEvent(userId: null, email: null));
+    _mockUsername = null;
+    _mockController.add(const AuthEvent(userId: null, email: null, username: null));
   }
 
   Future<void> sendPasswordReset(String email) async {
@@ -108,18 +153,21 @@ class AuthRepository {
     }
   }
 
-  Future<void> _mockSignIn(String email) async {
-    await _storage.write(key: _mockKey, value: email);
+  Future<void> _mockSignIn(String email, {String? username}) async {
+    await _storage.write(key: _mockEmailKey, value: email);
+    if (username != null) await _storage.write(key: _mockUsernameKey, value: username);
     _mockEmail = email;
+    _mockUsername = username ?? _mockUsername;
     _mockUserId = 'mock-${email.hashCode.toUnsigned(32)}';
-    _mockController.add(AuthEvent(userId: _mockUserId, email: email));
+    _mockController.add(AuthEvent(userId: _mockUserId, email: email, username: _mockUsername));
   }
 }
 
 class AuthEvent {
   final String? userId;
   final String? email;
-  const AuthEvent({required this.userId, required this.email});
+  final String? username;
+  const AuthEvent({required this.userId, required this.email, this.username});
   bool get isSignedIn => userId != null;
 }
 
