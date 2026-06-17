@@ -85,14 +85,27 @@ Skills: ${s(ctx, 'skills')}
 Polite, specific, and easy to reply to. Return only the message.`,
       };
 
-    case 'interviewAnswer':
+    case 'interviewQuestions':
       return {
         json: true,
+        prompt: `Generate 10 realistic interview questions for a ${s(ctx, 'jobTitle')} role
+${s(ctx, 'experienceLevel') ? `(${s(ctx, 'experienceLevel')} level)` : ''}.
+Mix behavioral, technical, and role-specific.
+Return a JSON object with a single key "questions" whose value is an array of 10 strings.`,
+      };
+
+    case 'interviewAnswer':
+      return {
+        json: false,
         prompt: `Generate a STAR-method interview answer.
 Question: ${s(ctx, 'question')}
 Job Title: ${s(ctx, 'jobTitle')}
 My Experience: ${s(ctx, 'experience')}
-Return JSON with keys: situation, task, action, result.`,
+Format as:
+Situation: ...
+Task: ...
+Action: ...
+Result: ...`,
       };
 
     case 'skillsSuggest':

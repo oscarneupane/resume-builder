@@ -22,7 +22,7 @@ class LinkedInScreen extends ConsumerWidget {
             label: 'Target job title',
             hint: 'e.g. Senior Flutter Developer',
             initialValue: c.jobTitle,
-            onChanged: (v) => c.jobTitle = v,
+            onChanged: c.setJobTitle,
           ),
           const SizedBox(height: 12),
           Row(

@@ -40,6 +40,7 @@ enum AiFeature {
   linkedinHeadline,
   linkedinAbout,
   recruiterMessage,
+  interviewQuestions,
   interviewAnswer,
   skillsSuggest,
 }

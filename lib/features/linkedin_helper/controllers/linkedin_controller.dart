@@ -44,6 +44,12 @@ class LinkedInController extends ChangeNotifier {
   bool get canGenerate => jobTitle.trim().isNotEmpty;
   bool isLoading(LinkedInSection s) => _loading.contains(s);
 
+  /// Notifies so the section Generate buttons enable/disable live.
+  void setJobTitle(String v) {
+    jobTitle = v;
+    notifyListeners();
+  }
+
   Future<void> generate(LinkedInSection section) async {
     if (!canGenerate || _loading.contains(section)) return;
     _loading.add(section);

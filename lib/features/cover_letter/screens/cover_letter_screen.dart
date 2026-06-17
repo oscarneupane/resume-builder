@@ -31,9 +31,9 @@ class _InputForm extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
-        AppTextField(label: 'Job title', initialValue: c.jobTitle, onChanged: (v) => c.jobTitle = v),
+        AppTextField(label: 'Job title', initialValue: c.jobTitle, onChanged: c.setJobTitle),
         const SizedBox(height: 12),
-        AppTextField(label: 'Company name', initialValue: c.companyName, onChanged: (v) => c.companyName = v),
+        AppTextField(label: 'Company name', initialValue: c.companyName, onChanged: c.setCompanyName),
         const SizedBox(height: 12),
         AppTextField(
           label: 'Key skills (optional)',
