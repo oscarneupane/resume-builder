@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:applymate/core/constants.dart';
+import 'package:applymate/features/cover_letter/controllers/cover_letter_controller.dart';
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
 import 'package:applymate/models/resume_model.dart';
 import 'package:applymate/shared/utils/validators.dart';
@@ -67,6 +68,39 @@ void main() {
         ..fullName = 'Ada'
         ..email = 'a@b.com';
       expect(c.completion, greaterThan(0));
+    });
+  });
+
+  group('CoverLetterResult.parse', () {
+    test('parses the 3-format JSON object', () {
+      final r = CoverLetterResult.parse(
+          '{"full_letter":"Dear...","short_email":"Hi","recruiter_msg":"Hey"}');
+      expect(r.fullLetter, 'Dear...');
+      expect(r.shortEmail, 'Hi');
+      expect(r.recruiterMsg, 'Hey');
+    });
+
+    test('falls back to full letter when given plain prose', () {
+      final r = CoverLetterResult.parse('just some text, not json');
+      expect(r.fullLetter, 'just some text, not json');
+      expect(r.shortEmail, '');
+    });
+
+    test('tolerates missing keys', () {
+      final r = CoverLetterResult.parse('{"full_letter":"Only this"}');
+      expect(r.fullLetter, 'Only this');
+      expect(r.recruiterMsg, '');
+    });
+  });
+
+  group('CoverLetterController', () {
+    test('canGenerate requires job title and company', () {
+      final c = CoverLetterController();
+      expect(c.canGenerate, isFalse);
+      c
+        ..jobTitle = 'Engineer'
+        ..companyName = 'Acme';
+      expect(c.canGenerate, isTrue);
     });
   });
 

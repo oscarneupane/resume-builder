@@ -96,6 +96,40 @@ class PdfService {
     );
   }
 
+  /// Builds a simple, ATS-friendly cover-letter PDF from plain body text.
+  Future<pw.Document> buildCoverLetter({
+    required String body,
+    String? senderName,
+    String? jobTitle,
+    String? companyName,
+  }) async {
+    final doc = pw.Document();
+    final accent = PdfColor.fromInt(0xFF1B3A6B);
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(48),
+        build: (ctx) => [
+          if ((senderName ?? '').isNotEmpty)
+            pw.Text(senderName!, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: accent)),
+          if ((jobTitle ?? '').isNotEmpty || (companyName ?? '').isNotEmpty)
+            pw.Text(
+              [if ((jobTitle ?? '').isNotEmpty) jobTitle, if ((companyName ?? '').isNotEmpty) companyName].join(' • '),
+              style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+            ),
+          pw.SizedBox(height: 20),
+          // Preserve the writer's paragraph breaks.
+          for (final para in body.split('\n'))
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: pw.Text(para, style: const pw.TextStyle(fontSize: 11, lineSpacing: 2)),
+            ),
+        ],
+      ),
+    );
+    return doc;
+  }
+
   pw.Widget _section(String title, PdfColor accent, pw.Widget child) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [

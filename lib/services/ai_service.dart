@@ -7,16 +7,26 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants.dart';
 import 'supabase_service.dart';
 
-/// Calls the Supabase Edge Function `ai-generate` (Part G3).
+/// Calls the Supabase AI Edge Functions (Part G/H).
 ///
-/// CRITICAL: never embed OpenAI keys here. We hit our Edge Function, which
-/// holds the key in env vars and enforces rate limiting.
+/// CRITICAL: never embed OpenAI keys here. We hit our Edge Functions, which hold
+/// the key in env vars and enforce rate limiting.
+///
+/// Routing: `atsCheck` → `ats-check`, `coverLetter` → `cover-letter`, everything
+/// else → `ai-generate`. The dedicated functions read the context fields at the
+/// top level; `ai-generate` expects `{feature, context}`.
 ///
 /// If Supabase isn't configured yet, we return a deterministic placeholder so
 /// the UI flows are exercisable in dev.
 class AiService {
   AiService._();
   static final instance = AiService._();
+
+  String _endpointFor(AiFeature feature) => switch (feature) {
+        AiFeature.atsCheck => AppConstants.fnAtsCheck,
+        AiFeature.coverLetter => AppConstants.fnCoverLetter,
+        _ => AppConstants.fnAiGenerate,
+      };
 
   Future<AiResult> generate({
     required AiFeature feature,
@@ -31,7 +41,11 @@ class AiService {
       return const AiResult.failure('Not signed in.');
     }
     final url = dotenv.env['SUPABASE_URL'];
-    final endpoint = Uri.parse('$url/functions/v1/${AppConstants.fnAiGenerate}');
+    final endpoint = Uri.parse('$url/functions/v1/${_endpointFor(feature)}');
+
+    // Dedicated functions take the context at the top level; ai-generate wraps it.
+    final isDedicated = feature == AiFeature.atsCheck || feature == AiFeature.coverLetter;
+    final payload = isDedicated ? context : {'feature': feature.name, 'context': context};
 
     final res = await http.post(
       endpoint,
@@ -39,7 +53,7 @@ class AiService {
         'Authorization': 'Bearer ${session.accessToken}',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({'feature': feature.name, 'context': context}),
+      body: jsonEncode(payload),
     );
 
     if (res.statusCode == 429) {
