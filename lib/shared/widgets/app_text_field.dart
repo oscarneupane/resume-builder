@@ -4,6 +4,7 @@ class AppTextField extends StatelessWidget {
   final String label;
   final String? hint;
   final TextEditingController? controller;
+  final String? initialValue;
   final TextInputType keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
@@ -17,6 +18,7 @@ class AppTextField extends StatelessWidget {
     required this.label,
     this.hint,
     this.controller,
+    this.initialValue,
     this.keyboardType = TextInputType.text,
     this.obscureText = false,
     this.suffixIcon,
@@ -24,7 +26,8 @@ class AppTextField extends StatelessWidget {
     this.onChanged,
     this.textInputAction,
     this.maxLines = 1,
-  });
+  }) : assert(controller == null || initialValue == null,
+            'Provide either controller or initialValue, not both.');
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +38,7 @@ class AppTextField extends StatelessWidget {
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
+          initialValue: initialValue,
           keyboardType: keyboardType,
           obscureText: obscureText,
           maxLines: obscureText ? 1 : maxLines,
