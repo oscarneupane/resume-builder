@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -68,6 +70,13 @@ class PdfService {
       ),
     );
     return doc;
+  }
+
+  /// Render the document to PDF bytes (for saving + sharing without rebuilding).
+  Future<Uint8List> save(pw.Document doc) => doc.save();
+
+  Future<void> shareBytes(Uint8List bytes, {String filename = 'document.pdf'}) async {
+    await Printing.sharePdf(bytes: bytes, filename: filename);
   }
 
   Future<void> sharePdf(pw.Document doc, {String filename = 'resume.pdf'}) async {

@@ -36,6 +36,20 @@ class JobApplication {
     this.createdAt,
   });
 
+  JobApplication copyWith({JobStatus? status, String? notes, String? companyName, String? jobTitle}) =>
+      JobApplication(
+        id: id,
+        userId: userId,
+        companyName: companyName ?? this.companyName,
+        jobTitle: jobTitle ?? this.jobTitle,
+        applicationDate: applicationDate,
+        status: status ?? this.status,
+        notes: notes ?? this.notes,
+        resumeId: resumeId,
+        coverLetterId: coverLetterId,
+        createdAt: createdAt,
+      );
+
   factory JobApplication.fromMap(Map<String, dynamic> m) => JobApplication(
         id: m['id'] as String,
         userId: m['user_id'] as String,

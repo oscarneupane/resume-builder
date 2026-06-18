@@ -6,6 +6,8 @@ import '../../../app/router.dart';
 import '../../../app/theme.dart';
 import '../../../core/constants.dart';
 import '../../../core/extensions.dart';
+import '../../../models/document_model.dart';
+import '../../../services/documents_repository.dart';
 import '../../../services/pdf_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../dashboard/widgets/ats_score_gauge.dart';
@@ -27,7 +29,12 @@ class _ResumePreviewScreenState extends ConsumerState<ResumePreviewScreen> {
     try {
       final doc = await PdfService.instance.buildResume(c.toResume());
       final safeName = (c.fullName.trim().isEmpty ? 'resume' : c.fullName.trim().replaceAll(RegExp(r'\s+'), '_'));
-      await PdfService.instance.sharePdf(doc, filename: '$safeName.pdf');
+      final fileName = '$safeName.pdf';
+      final bytes = await PdfService.instance.save(doc);
+      // Record it in My Docs, then open the share sheet.
+      await DocumentsRepository.instance.save(docType: DocType.resume, fileName: fileName, bytes: bytes);
+      await PdfService.instance.shareBytes(bytes, filename: fileName);
+      if (mounted) context.showSnack('Saved to My Docs');
     } catch (e) {
       if (mounted) context.showSnack('Export failed: $e');
     } finally {

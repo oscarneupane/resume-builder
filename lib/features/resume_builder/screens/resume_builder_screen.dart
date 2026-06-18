@@ -153,7 +153,8 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(AppSpacing.lg),
-                child: _buildStep(c),
+                // Re-key on revision so Smart Import re-seeds field initialValues.
+                child: KeyedSubtree(key: ValueKey('step-$_step-rev-${c.revision}'), child: _buildStep(c)),
               ),
             ),
             Padding(

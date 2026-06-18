@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants.dart';
@@ -172,6 +174,7 @@ class AiService {
           true
         );
       case AiFeature.coverLetter:
+        final bg = s('background');
         return (
           'You are a professional cover letter writer.\n'
               'Write a ${s('tone')} cover letter for:\n'
@@ -179,6 +182,7 @@ class AiService {
               'Company: ${s('companyName')}\n'
               'Applicant skills: ${s('skills')}\n'
               'Job Description: ${s('jobDescription')}\n'
+              '${bg.isEmpty ? '' : 'Applicant background (use real details from this, do not invent):\n$bg\n'}'
               'Return a JSON object with keys: full_letter, short_email, recruiter_msg.',
           true
         );
@@ -292,6 +296,172 @@ class AiService {
       case AiFeature.skillsSuggest:
         return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability']);
     }
+  }
+
+  // ── Extraction (upload → AI scan) ───────────────────────────────────────────
+
+  /// Scan a source into a concise plain-text summary (stored on a Material and
+  /// reused as generation context).
+  Future<AiResult> scanToSummary({Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
+    return _extract(
+      imageBytes: imageBytes,
+      pdfBytes: pdfBytes,
+      text: text,
+      structured: false,
+      prompt: 'Extract the key professional information from this document as clean, '
+          'concise plain text: full name, contact details, job titles & companies with '
+          'dates, education, and skills. Be faithful to the source and do NOT invent '
+          'anything. If a section is absent, omit it.',
+    );
+  }
+
+  /// Scan a source into structured resume JSON used to pre-fill the builder.
+  Future<AiResult> scanToResume({Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
+    return _extract(
+      imageBytes: imageBytes,
+      pdfBytes: pdfBytes,
+      text: text,
+      structured: true,
+      prompt: 'Extract resume data from this document as a JSON object with EXACTLY these keys: '
+          '"personal" {"fullName","title","email","phone","location","linkedin"}, '
+          '"summary" (string), '
+          '"experience" (array of {"title","company","startDate","endDate","bullets":[string]}), '
+          '"education" (array of {"degree","school","startDate","endDate"}), '
+          '"skills" (array of strings). '
+          'Use empty strings/arrays where unknown. Do NOT invent information.',
+    );
+  }
+
+  Future<AiResult> _extract({
+    Uint8List? imageBytes,
+    Uint8List? pdfBytes,
+    String? text,
+    required String prompt,
+    required bool structured,
+  }) async {
+    // PDFs are rasterized to an image so the vision model can read them.
+    Uint8List? image = imageBytes;
+    if (image == null && pdfBytes != null) {
+      image = await _pdfFirstPagePng(pdfBytes);
+    }
+
+    if (SupabaseService.isConfigured) {
+      return _extractViaEdge(prompt: prompt, image: image, text: text, structured: structured);
+    }
+    final key = _openAiKey;
+    if (key != null) {
+      return _extractViaOpenAi(prompt: prompt, image: image, text: text, structured: structured, apiKey: key);
+    }
+    return AiResult.ok(_mockExtraction(structured));
+  }
+
+  Future<Uint8List?> _pdfFirstPagePng(Uint8List pdf) async {
+    try {
+      await for (final page in Printing.raster(pdf, pages: [0], dpi: 150)) {
+        return page.toPng();
+      }
+    } catch (_) {/* fall through */}
+    return null;
+  }
+
+  Future<AiResult> _extractViaEdge({
+    required String prompt,
+    Uint8List? image,
+    String? text,
+    required bool structured,
+  }) async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return const AiResult.failure('Not signed in.');
+    final url = dotenv.env['SUPABASE_URL'];
+    final endpoint = Uri.parse('$url/functions/v1/${AppConstants.fnAiExtract}');
+    final res = await http.post(
+      endpoint,
+      headers: {'Authorization': 'Bearer ${session.accessToken}', 'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'prompt': prompt,
+        'structured': structured,
+        if (image != null) 'image': base64Encode(image),
+        if (text != null && text.trim().isNotEmpty) 'text': text,
+      }),
+    );
+    if (res.statusCode == 429) {
+      return const AiResult.failure('Free plan limit reached (3/week). Upgrade to Pro.', rateLimited: true);
+    }
+    if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode})');
+    return AiResult.ok((jsonDecode(res.body)['result'] as String?) ?? '');
+  }
+
+  Future<AiResult> _extractViaOpenAi({
+    required String prompt,
+    Uint8List? image,
+    String? text,
+    required bool structured,
+    required String apiKey,
+  }) async {
+    final content = <Map<String, dynamic>>[
+      {'type': 'text', 'text': text == null || text.trim().isEmpty ? prompt : '$prompt\n\nSOURCE:\n$text'},
+      if (image != null)
+        {
+          'type': 'image_url',
+          'image_url': {'url': 'data:image/png;base64,${base64Encode(image)}'},
+        },
+    ];
+    try {
+      final res = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {'Authorization': 'Bearer $apiKey', 'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'model': 'gpt-4o',
+          'messages': [
+            {'role': 'user', 'content': content}
+          ],
+          if (structured) 'response_format': {'type': 'json_object'},
+        }),
+      );
+      if (res.statusCode == 401) {
+        return const AiResult.failure('OpenAI rejected the API key. Check OPENAI_API_KEY in .env.');
+      }
+      if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode}).');
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final out = (body['choices']?[0]?['message']?['content'] as String?)?.trim() ?? '';
+      return AiResult.ok(out);
+    } catch (e) {
+      return AiResult.failure('Scan error: $e');
+    }
+  }
+
+  String _mockExtraction(bool structured) {
+    if (!structured) {
+      return 'Alex Doe — Senior Product Designer\n'
+          'alex.doe@example.com • Sydney, AU\n'
+          'Experience: Product Designer at Northwind (2021–present); Designer at Acme (2018–2021).\n'
+          'Education: BDes, UNSW (2018).\n'
+          'Skills: Figma, design systems, user research, prototyping.';
+    }
+    return jsonEncode({
+      'personal': {
+        'fullName': 'Alex Doe',
+        'title': 'Senior Product Designer',
+        'email': 'alex.doe@example.com',
+        'phone': '0400 000 000',
+        'location': 'Sydney, AU',
+        'linkedin': 'in/alexdoe',
+      },
+      'summary': 'Product designer with 6+ years crafting accessible, data-informed experiences.',
+      'experience': [
+        {
+          'title': 'Senior Product Designer',
+          'company': 'Northwind',
+          'startDate': '2021',
+          'endDate': 'Present',
+          'bullets': ['Led the design system used across 4 squads', 'Raised activation 18% via onboarding redesign'],
+        },
+      ],
+      'education': [
+        {'degree': 'BDes', 'school': 'UNSW', 'startDate': '2014', 'endDate': '2018'},
+      ],
+      'skills': ['Figma', 'Design systems', 'User research', 'Prototyping'],
+    });
   }
 }
 

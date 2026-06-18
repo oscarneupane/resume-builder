@@ -4,10 +4,75 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
+import '../../../models/document_model.dart';
+import '../../../services/documents_repository.dart';
 import '../../../services/pdf_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../materials/controllers/materials_controller.dart';
 import '../controllers/cover_letter_controller.dart';
+
+/// Lets the user attach a saved Material as background the AI uses when writing.
+class _BackgroundPicker extends StatelessWidget {
+  final CoverLetterController c;
+  final WidgetRef parentRef;
+  const _BackgroundPicker({required this.c, required this.parentRef});
+
+  @override
+  Widget build(BuildContext context) {
+    if (c.backgroundLabel != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.auto_awesome, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Using: ${c.backgroundLabel}', style: context.text.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+            GestureDetector(onTap: c.clearBackground, child: const Icon(Icons.close, size: 18, color: AppColors.textSecondary)),
+          ],
+        ),
+      );
+    }
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.auto_awesome, size: 18),
+      label: const Text('Use one of my materials'),
+      onPressed: () {
+        final mats = parentRef.read(materialsControllerProvider).materials;
+        if (mats.isEmpty) {
+          context.showSnack('No saved materials yet — add one in Resources.');
+          return;
+        }
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          builder: (sheetCtx) => SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const Padding(padding: EdgeInsets.all(16), child: Text('Use which material?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+                for (final m in mats)
+                  ListTile(
+                    title: Text(m.title),
+                    subtitle: Text(m.preview, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    onTap: () {
+                      c.attachBackground(m.title, m.extractedText);
+                      Navigator.pop(sheetCtx);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 class CoverLetterScreen extends ConsumerWidget {
   const CoverLetterScreen({super.key});
@@ -17,20 +82,23 @@ class CoverLetterScreen extends ConsumerWidget {
     final c = ref.watch(coverLetterControllerProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Cover Letter Builder')),
-      body: c.result == null ? _InputForm(c) : _OutputView(c),
+      body: c.result == null ? _InputForm(c, ref) : _OutputView(c),
     );
   }
 }
 
 class _InputForm extends StatelessWidget {
   final CoverLetterController c;
-  const _InputForm(this.c);
+  final WidgetRef ref;
+  const _InputForm(this.c, this.ref);
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
+        _BackgroundPicker(c: c, parentRef: ref),
+        const SizedBox(height: 12),
         AppTextField(label: 'Job title', initialValue: c.jobTitle, onChanged: c.setJobTitle),
         const SizedBox(height: 12),
         AppTextField(label: 'Company name', initialValue: c.companyName, onChanged: c.setCompanyName),
@@ -142,7 +210,11 @@ class _LetterTab extends StatelessWidget {
       final name = c.companyName.trim().isEmpty
           ? 'cover_letter'
           : 'cover_letter_${c.companyName.trim().replaceAll(RegExp(r"\s+"), "_")}';
-      await PdfService.instance.sharePdf(doc, filename: '$name.pdf');
+      final fileName = '$name.pdf';
+      final bytes = await PdfService.instance.save(doc);
+      await DocumentsRepository.instance.save(docType: DocType.coverLetter, fileName: fileName, bytes: bytes);
+      await PdfService.instance.shareBytes(bytes, filename: fileName);
+      if (context.mounted) context.showSnack('Saved to My Docs');
     } catch (e) {
       if (context.mounted) context.showSnack('Export failed: $e');
     }

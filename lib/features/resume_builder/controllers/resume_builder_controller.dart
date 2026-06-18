@@ -89,6 +89,65 @@ class ResumeBuilderController extends ChangeNotifier {
   /// update the same row instead of creating duplicates.
   String? savedResumeId;
 
+  /// Bumped when data is applied externally (e.g. Smart Import) so the builder
+  /// can re-key its fields and pick up the new initialValues.
+  int revision = 0;
+
+  /// Pre-fills the draft from AI-extracted resume JSON (Smart Import).
+  void applyExtracted(Map<String, dynamic> data) {
+    String s(Object? v) => (v ?? '').toString().trim();
+    final p = Map<String, dynamic>.from((data['personal'] as Map?) ?? const {});
+    if (s(p['fullName']).isNotEmpty) fullName = s(p['fullName']);
+    if (s(p['title']).isNotEmpty) title = s(p['title']);
+    if (s(p['email']).isNotEmpty) email = s(p['email']);
+    if (s(p['phone']).isNotEmpty) phone = s(p['phone']);
+    if (s(p['location']).isNotEmpty) location = s(p['location']);
+    if (s(p['linkedin']).isNotEmpty) linkedin = s(p['linkedin']);
+    if (s(data['summary']).isNotEmpty) summary = s(data['summary']);
+
+    final exp = (data['experience'] as List?) ?? const [];
+    if (exp.isNotEmpty) {
+      experiences
+        ..clear()
+        ..addAll(exp.map((e) {
+          final m = Map<String, dynamic>.from(e as Map);
+          final bullets = ((m['bullets'] as List?) ?? const []).map((b) => b.toString()).toList();
+          final end = s(m['endDate']);
+          return ExperienceEntry(
+            title: s(m['title']),
+            company: s(m['company']),
+            startDate: s(m['startDate']),
+            endDate: end.toLowerCase() == 'present' ? '' : end,
+            current: end.toLowerCase() == 'present',
+            bullets: bullets.isEmpty ? [''] : bullets,
+          );
+        }));
+    }
+
+    final edu = (data['education'] as List?) ?? const [];
+    if (edu.isNotEmpty) {
+      education
+        ..clear()
+        ..addAll(edu.map((e) {
+          final m = Map<String, dynamic>.from(e as Map);
+          return EducationEntry(
+            degree: s(m['degree']),
+            school: s(m['school']),
+            startDate: s(m['startDate']),
+            endDate: s(m['endDate']),
+          );
+        }));
+    }
+
+    for (final sk in ((data['skills'] as List?) ?? const [])) {
+      final v = sk.toString().trim();
+      if (v.isNotEmpty && !skills.contains(v)) skills.add(v);
+    }
+
+    revision++;
+    notifyListeners();
+  }
+
   void update(VoidCallback mutate) {
     mutate();
     notifyListeners();
