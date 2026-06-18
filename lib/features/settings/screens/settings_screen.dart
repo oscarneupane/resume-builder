@@ -4,59 +4,151 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../app/theme.dart';
+import '../../../core/constants.dart';
 import '../../../core/extensions.dart';
 import '../../auth/auth_provider.dart';
+import '../../dashboard/screens/home_shell.dart' show ProfileHeaderCard;
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final email = ref.watch(authStateProvider).email ?? 'Unknown';
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _aiTips = true;
+  bool _weeklyReminder = true;
+
+  Future<void> _confirmLogout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You can sign back in anytime.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Log out', style: TextStyle(color: AppColors.error))),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authControllerProvider).signOut();
+      if (mounted) context.showSnack('Logged out');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = ref.watch(authStateProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
-          ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-            title: const Text('Account'),
-            subtitle: Text(email),
+          ProfileHeaderCard(name: auth.displayName, email: auth.email),
+          const SizedBox(height: 24),
+
+          _GroupCard(
+            title: 'Account',
+            children: [
+              _SettingRow(icon: Icons.workspace_premium_outlined, label: 'Subscription', onTap: () => context.push(AppRoutes.subscription)),
+              _SettingRow(icon: Icons.lock_outline, label: 'Change password', onTap: () => context.showSnack('Password reset coming soon')),
+            ],
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.workspace_premium_outlined),
-            title: const Text('Subscription'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.subscription),
+          const SizedBox(height: 16),
+
+          _GroupCard(
+            title: 'Notifications',
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.tips_and_updates_outlined, color: AppColors.primary),
+                title: const Text('AI tips'),
+                value: _aiTips,
+                activeColor: AppColors.primary,
+                onChanged: (v) => setState(() => _aiTips = v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.calendar_today_outlined, color: AppColors.primary),
+                title: const Text('Weekly progress reminder'),
+                value: _weeklyReminder,
+                activeColor: AppColors.primary,
+                onChanged: (v) => setState(() => _weeklyReminder = v),
+              ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            trailing: Switch(value: true, onChanged: (_) {}),
+          const SizedBox(height: 16),
+
+          _GroupCard(
+            title: 'Legal',
+            children: [
+              _SettingRow(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy', onTap: () => context.push(AppRoutes.privacy)),
+              _SettingRow(icon: Icons.gavel_outlined, label: 'Terms of Service', onTap: () => context.push(AppRoutes.terms)),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy policy'),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () {},
+          const SizedBox(height: 24),
+
+          Center(
+            child: TextButton.icon(
+              icon: const Icon(Icons.logout, color: AppColors.error, size: 18),
+              label: const Text('Log out', style: TextStyle(color: AppColors.error)),
+              onPressed: _confirmLogout,
+            ),
           ),
-          ListTile(
-            leading: const Icon(Icons.gavel_outlined),
-            title: const Text('Terms of service'),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () {},
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.error),
-            title: const Text('Log out', style: TextStyle(color: AppColors.error)),
-            onTap: () async {
-              await ref.read(authControllerProvider).signOut();
-              if (context.mounted) context.showSnack('Logged out');
-            },
-          ),
+          const SizedBox(height: 8),
+          Center(child: Text('${AppConstants.appName}  v1.0.0', style: context.text.bodySmall)),
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+}
+
+class _GroupCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  const _GroupCard({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(title.toUpperCase(),
+              style: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppColors.cardSurface,
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(children: children),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _SettingRow({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(label),
+      trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+      onTap: onTap,
     );
   }
 }
