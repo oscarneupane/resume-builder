@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
+import '../../../models/document_model.dart';
+import '../../../services/documents_repository.dart';
 import '../../../services/pdf_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -142,7 +144,11 @@ class _LetterTab extends StatelessWidget {
       final name = c.companyName.trim().isEmpty
           ? 'cover_letter'
           : 'cover_letter_${c.companyName.trim().replaceAll(RegExp(r"\s+"), "_")}';
-      await PdfService.instance.sharePdf(doc, filename: '$name.pdf');
+      final fileName = '$name.pdf';
+      final bytes = await PdfService.instance.save(doc);
+      await DocumentsRepository.instance.save(docType: DocType.coverLetter, fileName: fileName, bytes: bytes);
+      await PdfService.instance.shareBytes(bytes, filename: fileName);
+      if (context.mounted) context.showSnack('Saved to My Docs');
     } catch (e) {
       if (context.mounted) context.showSnack('Export failed: $e');
     }

@@ -5,6 +5,7 @@ import 'package:applymate/features/cover_letter/controllers/cover_letter_control
 import 'package:applymate/features/interview_prep/controllers/interview_controller.dart';
 import 'package:applymate/features/linkedin_helper/controllers/linkedin_controller.dart';
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
+import 'package:applymate/models/document_model.dart';
 import 'package:applymate/models/job_application_model.dart';
 import 'package:applymate/models/resume_model.dart';
 import 'package:applymate/services/job_repository.dart';
@@ -213,6 +214,24 @@ void main() {
 
       await repo.delete(job.id);
       expect((await repo.list()).any((j) => j.id == job.id), isFalse);
+    });
+  });
+
+  group('Document', () {
+    test('DocType parse/value round-trip (cover_letter)', () {
+      expect(DocType.coverLetter.value, 'cover_letter');
+      expect(DocType.parse('cover_letter'), DocType.coverLetter);
+      expect(DocType.parse('resume'), DocType.resume);
+    });
+
+    test('prettySize formats bytes/KB/MB', () {
+      Document d(int size) => Document(
+            id: '1', userId: 'u', docType: DocType.resume, fileName: 'a.pdf',
+            storagePath: 'p', fileSize: size, createdAt: DateTime(2026));
+      expect(d(0).prettySize, '—');
+      expect(d(512).prettySize, '512 B');
+      expect(d(2048).prettySize, '2.0 KB');
+      expect(d(2 * 1024 * 1024).prettySize, '2.0 MB');
     });
   });
 
