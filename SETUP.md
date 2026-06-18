@@ -77,7 +77,24 @@ How it routes (see `lib/services/ai_service.dart`):
 
 ---
 
-## 3. Stripe — subscriptions (optional for dev)
+## 3. Google Places — address autocomplete (optional)
+
+Powers suggestions on the **Location / address** field in the Resume Builder.
+Without it, that field is a normal text input.
+
+1. Go to <https://console.cloud.google.com> → create/select a project.
+2. **APIs & Services → Library** → enable **"Places API"** (and ensure billing is on).
+3. **APIs & Services → Credentials → Create credentials → API key** → copy it (starts with `AIza...`).
+4. **Restrict the key** (recommended): Application restriction → Android apps (package
+   `com.example.applymate` + your SHA-1); API restriction → Places API only.
+5. In `.env`:
+
+   ```env
+   GOOGLE_PLACES_API_KEY=AIza...your-key
+   ```
+6. Rebuild. Start typing an address in the builder and suggestions appear.
+
+## 4. Stripe — subscriptions (optional for dev)
 
 Only the **publishable** key goes in the app; secret/webhook keys are Supabase secrets.
 
