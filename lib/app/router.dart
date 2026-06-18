@@ -15,6 +15,7 @@ import '../features/dashboard/screens/home_shell.dart';
 import '../features/documents/screens/documents_screen.dart';
 import '../features/interview_prep/screens/interview_screen.dart';
 import '../features/job_tracker/screens/job_tracker_screen.dart';
+import '../features/legal/screens/legal_screen.dart';
 import '../features/linkedin_helper/screens/linkedin_screen.dart';
 import '../features/materials/screens/materials_screen.dart';
 import '../features/onboarding/screens/onboarding_screen.dart';
@@ -49,6 +50,8 @@ class AppRoutes {
   static const jobTracker = '/jobs';
   static const materials = '/materials';
   static const settings = '/settings';
+  static const privacy = '/privacy';
+  static const terms = '/terms';
   static const subscription = '/subscription';
   static const paymentSuccess = '/payment-success';
   static const paymentFailed = '/payment-failed';
@@ -119,6 +122,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: AppRoutes.interview, builder: (_, __) => const InterviewScreen()),
       GoRoute(path: AppRoutes.jobTracker, builder: (_, __) => const JobTrackerScreen()),
       GoRoute(path: AppRoutes.settings, builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: AppRoutes.privacy, builder: (_, __) => const LegalScreen(doc: LegalDoc.privacy)),
+      GoRoute(path: AppRoutes.terms, builder: (_, __) => const LegalScreen(doc: LegalDoc.terms)),
       GoRoute(path: AppRoutes.subscription, builder: (_, __) => const SubscriptionScreen()),
       GoRoute(path: AppRoutes.paymentSuccess, builder: (_, __) => const PaymentSuccessScreen()),
       GoRoute(path: AppRoutes.paymentFailed, builder: (_, __) => const PaymentFailedScreen()),
