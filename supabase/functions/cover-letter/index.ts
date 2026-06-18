@@ -12,15 +12,16 @@ serve(async (req) => {
     const ctx = await requireUser(req);
     if (!(await checkRateLimit(ctx))) return json({ error: 'rate_limit' }, 429);
 
-    const { jobTitle, companyName, skills, jobDescription, tone, resumeId } = await req.json();
+    const { jobTitle, companyName, skills, jobDescription, tone, background, resumeId } = await req.json();
 
+    const bg = (background ?? '').toString().trim();
     const prompt = `You are a professional cover letter writer.
 Write a ${tone ?? 'professional'} cover letter for:
 Job Title: ${jobTitle ?? ''}
 Company: ${companyName ?? ''}
 Applicant skills: ${skills ?? ''}
 Job Description: ${jobDescription ?? ''}
-Return a JSON object with keys: full_letter, short_email, recruiter_msg`;
+${bg ? `Applicant background (use real details from this, do not invent):\n${bg}\n` : ''}Return a JSON object with keys: full_letter, short_email, recruiter_msg`;
 
     const { content, tokens } = await chat(prompt, { json: true });
     await logUsage(ctx, 'coverLetter', tokens);

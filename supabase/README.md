@@ -12,12 +12,15 @@ mode** (see `lib/services/supabase_service.dart`).
 supabase/
 ├── config.toml                  # CLI config (stripe-webhook has verify_jwt=false)
 ├── migrations/
-│   └── 0001_init.sql            # 11 tables, RLS, storage bucket+policies, delete_user()
+│   ├── 0001_init.sql            # 11 tables, RLS, storage bucket+policies, delete_user()
+│   ├── 0002_username.sql        # profiles.username + signup trigger
+│   └── 0003_materials.sql       # materials table + materials storage bucket
 └── functions/
     ├── _shared/                 # cors, auth/rate-limit, openai prompt helpers
     ├── ai-generate/             # Part G3 — summary, bullet, linkedin, skills, interview
     ├── ats-check/               # ATS score + keyword analysis
     ├── cover-letter/            # 3 formats (full / short email / recruiter)
+    ├── ai-extract/              # GPT-4o vision: scan uploads → text/JSON (materials, import)
     ├── create-checkout/         # Part H3 — Stripe Checkout session
     └── stripe-webhook/          # Part H4 — sync subscription status
 ```
@@ -48,6 +51,7 @@ folder policies, the profile-on-signup trigger, and `delete_user()`.
 supabase functions deploy ai-generate
 supabase functions deploy ats-check
 supabase functions deploy cover-letter
+supabase functions deploy ai-extract
 supabase functions deploy create-checkout
 supabase functions deploy stripe-webhook --no-verify-jwt
 ```

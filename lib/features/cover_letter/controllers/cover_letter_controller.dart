@@ -55,6 +55,22 @@ class CoverLetterController extends ChangeNotifier {
   String jobDescription = '';
   CoverLetterTone tone = CoverLetterTone.professional;
 
+  /// Background pulled from a saved Material (scanned resume/notes), fed to the AI.
+  String background = '';
+  String? backgroundLabel; // shows which material is attached
+
+  void attachBackground(String label, String text) {
+    backgroundLabel = label;
+    background = text;
+    notifyListeners();
+  }
+
+  void clearBackground() {
+    backgroundLabel = null;
+    background = '';
+    notifyListeners();
+  }
+
   bool loading = false;
   String? error;
   CoverLetterResult? result;
@@ -91,6 +107,7 @@ class CoverLetterController extends ChangeNotifier {
         'skills': skills.trim(),
         'jobDescription': jobDescription.trim(),
         'tone': tone.name,
+        'background': background.trim(),
       },
     );
 

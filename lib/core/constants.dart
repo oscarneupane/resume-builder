@@ -13,6 +13,7 @@ class AppConstants {
   static const fnAiGenerate = 'ai-generate';
   static const fnAtsCheck = 'ats-check';
   static const fnCoverLetter = 'cover-letter';
+  static const fnAiExtract = 'ai-extract';
   static const fnCreateCheckout = 'create-checkout';
 
   // Local storage keys

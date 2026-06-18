@@ -7,6 +7,7 @@ import 'package:applymate/features/linkedin_helper/controllers/linkedin_controll
 import 'package:applymate/features/resume_builder/controllers/resume_builder_controller.dart';
 import 'package:applymate/models/document_model.dart';
 import 'package:applymate/models/job_application_model.dart';
+import 'package:applymate/models/material_model.dart';
 import 'package:applymate/models/resume_model.dart';
 import 'package:applymate/services/job_repository.dart';
 import 'package:applymate/shared/utils/validators.dart';
@@ -232,6 +233,47 @@ void main() {
       expect(d(512).prettySize, '512 B');
       expect(d(2048).prettySize, '2.0 KB');
       expect(d(2 * 1024 * 1024).prettySize, '2.0 MB');
+    });
+  });
+
+  group('Material', () {
+    test('kind parse/label', () {
+      expect(MaterialKind.parse('image'), MaterialKind.image);
+      expect(MaterialKind.pdf.label, 'PDF');
+    });
+
+    test('preview truncates long extracted text', () {
+      final m = Material(
+        id: '1', userId: 'u', kind: MaterialKind.text, title: 'Notes',
+        extractedText: 'x' * 200, createdAt: DateTime(2026));
+      expect(m.preview.endsWith('…'), isTrue);
+      expect(m.preview.length, lessThanOrEqualTo(121));
+    });
+  });
+
+  group('Smart Import (applyExtracted)', () {
+    test('maps extracted JSON into the builder draft', () {
+      final c = ResumeBuilderController();
+      c.applyExtracted({
+        'personal': {'fullName': 'Grace Hopper', 'email': 'grace@navy.mil', 'title': 'Engineer'},
+        'summary': 'Pioneer.',
+        'experience': [
+          {'title': 'Programmer', 'company': 'US Navy', 'startDate': '1944', 'endDate': 'Present', 'bullets': ['Built COBOL']}
+        ],
+        'education': [
+          {'degree': 'PhD', 'school': 'Yale'}
+        ],
+        'skills': ['COBOL', 'Leadership'],
+      });
+
+      expect(c.fullName, 'Grace Hopper');
+      expect(c.email, 'grace@navy.mil');
+      expect(c.summary, 'Pioneer.');
+      expect(c.experiences.first.company, 'US Navy');
+      expect(c.experiences.first.current, isTrue); // "Present" → current
+      expect(c.education.first.school, 'Yale');
+      expect(c.skills, containsAll(['COBOL', 'Leadership']));
+      expect(c.revision, 1);
     });
   });
 

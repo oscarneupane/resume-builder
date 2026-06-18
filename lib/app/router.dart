@@ -16,6 +16,7 @@ import '../features/documents/screens/documents_screen.dart';
 import '../features/interview_prep/screens/interview_screen.dart';
 import '../features/job_tracker/screens/job_tracker_screen.dart';
 import '../features/linkedin_helper/screens/linkedin_screen.dart';
+import '../features/materials/screens/materials_screen.dart';
 import '../features/onboarding/screens/onboarding_screen.dart';
 import '../features/resume_builder/screens/resume_builder_screen.dart';
 import '../features/resume_builder/screens/resume_list_screen.dart';
@@ -46,6 +47,7 @@ class AppRoutes {
   static const linkedin = '/linkedin';
   static const interview = '/interview';
   static const jobTracker = '/jobs';
+  static const materials = '/materials';
   static const settings = '/settings';
   static const subscription = '/subscription';
   static const paymentSuccess = '/payment-success';
@@ -102,7 +104,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: AppRoutes.dashboard, builder: (_, __) => const DashboardTab()),
           GoRoute(path: AppRoutes.docs, builder: (_, __) => const DocumentsScreen()),
           GoRoute(path: AppRoutes.create, builder: (_, __) => const QuickCreateScreen()),
-          GoRoute(path: AppRoutes.resources, builder: (_, __) => const ResourcesScreen()),
+          GoRoute(path: AppRoutes.resources, builder: (_, __) => const MaterialsScreen()),
           GoRoute(path: AppRoutes.profile, builder: (_, __) => const ProfileTabScreen()),
         ],
       ),
