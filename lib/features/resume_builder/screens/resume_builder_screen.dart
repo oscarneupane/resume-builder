@@ -256,7 +256,7 @@ class TemplateOption extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.description_outlined, color: AppColors.primary),
+            const Icon(Icons.description_outlined, color: AppColors.primary),
             const SizedBox(width: 12),
             Text(name.capitalized, style: context.text.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
             const Spacer(),

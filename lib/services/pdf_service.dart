@@ -27,9 +27,9 @@ class PdfService {
             .toList();
 
     final accent = switch (resume.template) {
-      'modern' => PdfColor.fromInt(0xFF2E75B6),
-      'minimal' => PdfColor.fromInt(0xFF1A1A1A),
-      _ => PdfColor.fromInt(0xFF1B3A6B),
+      'modern' => const PdfColor.fromInt(0xFF2E75B6),
+      'minimal' => const PdfColor.fromInt(0xFF1A1A1A),
+      _ => const PdfColor.fromInt(0xFF1B3A6B),
     };
 
     doc.addPage(
@@ -97,7 +97,7 @@ class PdfService {
       children: [
         pw.Text(name, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: accent)),
         if (title.isNotEmpty)
-          pw.Text(title, style: pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
+          pw.Text(title, style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700)),
         if (contact.isNotEmpty) pw.SizedBox(height: 4),
         if (contact.isNotEmpty) pw.Text(contact, style: const pw.TextStyle(fontSize: 10)),
         pw.SizedBox(height: 12),
@@ -113,14 +113,14 @@ class PdfService {
     String? companyName,
   }) async {
     final doc = pw.Document();
-    final accent = PdfColor.fromInt(0xFF1B3A6B);
+    const accent = PdfColor.fromInt(0xFF1B3A6B);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(48),
         build: (ctx) => [
           if ((senderName ?? '').isNotEmpty)
-            pw.Text(senderName!, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: accent)),
+            pw.Text(senderName!, style: const pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: accent)),
           if ((jobTitle ?? '').isNotEmpty || (companyName ?? '').isNotEmpty)
             pw.Text(
               [if ((jobTitle ?? '').isNotEmpty) jobTitle, if ((companyName ?? '').isNotEmpty) companyName].join(' • '),
@@ -158,7 +158,7 @@ class PdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text('${e['title'] ?? ''} • ${e['company'] ?? ''}',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+              style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
           pw.Text('${e['startDate'] ?? ''} — ${e['endDate'] ?? 'Present'}',
               style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
           ...bullets.map((b) => pw.Bullet(text: b, style: const pw.TextStyle(fontSize: 10))),
@@ -173,7 +173,7 @@ class PdfService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text('${e['degree'] ?? ''}',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                style: const pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
             pw.Text('${e['school'] ?? ''} • ${e['endDate'] ?? ''}',
                 style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
           ],

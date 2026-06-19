@@ -66,7 +66,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 secondary: const Icon(Icons.tips_and_updates_outlined, color: AppColors.primary),
                 title: const Text('AI tips'),
                 value: _aiTips,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) => setState(() => _aiTips = v),
               ),
               SwitchListTile(
@@ -74,7 +74,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 secondary: const Icon(Icons.calendar_today_outlined, color: AppColors.primary),
                 title: const Text('Weekly progress reminder'),
                 value: _weeklyReminder,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (v) => setState(() => _weeklyReminder = v),
               ),
             ],

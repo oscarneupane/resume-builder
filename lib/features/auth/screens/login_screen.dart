@@ -143,7 +143,7 @@ class _LoginHeader extends StatelessWidget {
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(Icons.terrain_rounded, size: 36, color: Colors.white),

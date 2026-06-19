@@ -252,7 +252,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary.withOpacity(0.08) : AppColors.cardSurface,
+            color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.cardSurface,
             borderRadius: BorderRadius.circular(AppRadii.card),
             border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
           ),

@@ -173,7 +173,7 @@ class ExperienceStep extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             title: const Text('I currently work here'),
             value: e.current,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             onChanged: (v) => c.update(() => e.current = v),
           ),
           const Divider(),
