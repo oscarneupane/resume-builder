@@ -27,10 +27,11 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
   int _step = 0;
   bool _summaryLoading = false;
   bool _skillsLoading = false;
+  bool _generatingAll = false;
   bool _saving = false;
   final _personalFormKey = GlobalKey<FormState>();
 
-  static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Skills', 'Extras', 'Template'];
+  static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Projects', 'Skills', 'Extras'];
 
   Future<void> _saveDraft(ResumeBuilderController c) async {
     if (!SupabaseService.isConfigured) {
@@ -70,6 +71,90 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
     } else {
       context.showSnack(res.error ?? 'Could not generate summary.');
     }
+  }
+
+  /// AI writes a complete resume from whatever the user has entered so far,
+  /// formatted into the app's single ATS layout. Enriches wording — does not
+  /// invent employers/schools/dates (enforced in the prompt).
+  Future<void> _generateFullResume(ResumeBuilderController c) async {
+    final input = await _showGenerateDialog(c);
+    if (input == null) return;
+
+    setState(() => _generatingAll = true);
+    final res = await AiService.instance.generate(
+      feature: AiFeature.fullResume,
+      context: {
+        'jobTitle': input.$1,
+        'notes': input.$2,
+        'details': c.aiDetails(),
+      },
+    );
+    if (!mounted) return;
+    setState(() => _generatingAll = false);
+
+    if (!res.isOk || res.text == null) {
+      context.showSnack(res.error ?? 'Could not generate the resume.');
+      return;
+    }
+    try {
+      final data = jsonDecode(res.text!) as Map<String, dynamic>;
+      // Fresh AI pass owns skills/projects — clear so grouped output isn't merged.
+      c.update(() {
+        c.skills.clear();
+        c.projects
+          ..clear()
+          ..add(ProjectEntry());
+      });
+      c.applyExtracted(data);
+      if (!mounted) return;
+      context.showSnack('Resume generated — review and export.');
+      context.push(AppRoutes.resumePreview);
+    } catch (_) {
+      context.showSnack('The AI returned an unexpected format. Please try again.');
+    }
+  }
+
+  /// Collects a target role (defaults to the entered title) and optional notes.
+  Future<(String, String)?> _showGenerateDialog(ResumeBuilderController c) {
+    final roleCtrl = TextEditingController(text: c.title);
+    final notesCtrl = TextEditingController();
+    return showDialog<(String, String)>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Generate with AI'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'AI will write a complete resume from the details you’ve entered, '
+              'using real facts only — it won’t invent jobs or dates.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: roleCtrl,
+              decoration: const InputDecoration(labelText: 'Target role', hintText: 'e.g. IT Support Officer'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: notesCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Anything else? (optional)',
+                hintText: 'Tone, focus areas, target company…',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, (roleCtrl.text.trim(), notesCtrl.text.trim())),
+            child: const Text('Generate'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onNext() {
@@ -122,6 +207,14 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
             child: Text(_saving ? 'Saving…' : 'Save Draft'),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _generatingAll ? null : () => _generateFullResume(c),
+        icon: _generatingAll
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.auto_awesome),
+        label: Text(_generatingAll ? 'Writing…' : 'Generate with AI'),
+        backgroundColor: AppColors.primary,
       ),
       body: SafeArea(
         child: Column(
@@ -196,74 +289,12 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
       case 3:
         return EducationStep(c);
       case 4:
-        return SkillsStep(c, onAiSuggest: () => _suggestSkills(c), aiLoading: _skillsLoading);
+        return ProjectsStep(c);
       case 5:
-        return ExtrasStep(c);
+        return SkillsStep(c, onAiSuggest: () => _suggestSkills(c), aiLoading: _skillsLoading);
       case 6:
-        return _TemplateStep(c);
+        return ExtrasStep(c);
     }
     return const SizedBox.shrink();
-  }
-}
-
-/// Step 6 — template chooser (also available from the preview screen).
-class _TemplateStep extends StatelessWidget {
-  final ResumeBuilderController c;
-  const _TemplateStep(this.c);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Pick a template', style: context.text.titleLarge),
-        const SizedBox(height: 4),
-        Text('You can change this anytime from the preview.',
-            style: context.text.bodySmall),
-        const SizedBox(height: 16),
-        for (final t in AppConstants.availableTemplates)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: TemplateOption(
-              name: t,
-              selected: c.template == t,
-              onTap: () => c.setTemplate(t),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Reusable template option card (used in builder step and preview drawer).
-class TemplateOption extends StatelessWidget {
-  final String name;
-  final bool selected;
-  final VoidCallback onTap;
-  const TemplateOption({super.key, required this.name, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.cardSurface,
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.description_outlined, color: AppColors.primary),
-            const SizedBox(width: 12),
-            Text(name.capitalized, style: context.text.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
-            const Spacer(),
-            if (selected) const Icon(Icons.check_circle, color: AppColors.primary),
-          ],
-        ),
-      ),
-    );
   }
 }

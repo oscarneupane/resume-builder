@@ -62,6 +62,72 @@ class PersonalStep extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           AppTextField(label: 'LinkedIn URL', initialValue: c.linkedin, onChanged: (v) => c.linkedin = v),
+          const SizedBox(height: 12),
+          AppTextField(label: 'GitHub URL', initialValue: c.github, onChanged: (v) => c.github = v),
+          const SizedBox(height: 12),
+          AppTextField(label: 'Portfolio URL', initialValue: c.portfolio, onChanged: (v) => c.portfolio = v),
+        ],
+      ),
+    );
+  }
+}
+
+/// Step 4 — Projects (repeating). Optional; the AI generator fills these too.
+class ProjectsStep extends StatelessWidget {
+  final ResumeBuilderController c;
+  const ProjectsStep(this.c, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < c.projects.length; i++) _entry(context, i),
+        const SizedBox(height: 8),
+        AppButton(
+          label: 'Add Project',
+          icon: Icons.add,
+          variant: AppButtonVariant.secondary,
+          onPressed: c.addProject,
+        ),
+      ],
+    );
+  }
+
+  Widget _entry(BuildContext context, int i) {
+    final p = c.projects[i];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text('Project ${i + 1}', style: context.text.titleLarge),
+              const Spacer(),
+              if (c.projects.length > 1)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                  onPressed: () => c.removeProject(i),
+                ),
+            ],
+          ),
+          AppTextField(label: 'Project name', initialValue: p.name, onChanged: (v) => p.name = v),
+          const SizedBox(height: 10),
+          AppTextField(
+            label: 'Description',
+            hint: 'What it does / what you built',
+            initialValue: p.description,
+            onChanged: (v) => p.description = v,
+          ),
+          const SizedBox(height: 10),
+          AppTextField(label: 'Link (optional)', initialValue: p.link, onChanged: (v) => p.link = v),
         ],
       ),
     );

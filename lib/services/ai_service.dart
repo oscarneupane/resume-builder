@@ -152,6 +152,29 @@ class AiService {
               'Return ONLY the summary text, no preamble.',
           false
         );
+      case AiFeature.fullResume:
+        return (
+          'You are an expert resume writer and career coach.\n'
+              'Using ONLY the candidate details below, produce a complete, polished, '
+              'ATS-friendly resume. Improve the wording, write strong action-verb '
+              'bullet points with quantified impact where plausible, group technical '
+              'skills by category, and write concise one-line project descriptions.\n'
+              'Do NOT invent employers, schools, job titles, dates, or contact details '
+              'that are not present in the details — only enrich the wording around the '
+              'real facts. If a section has no source data, return it empty.\n'
+              'Target role: ${s('jobTitle')}\n'
+              "${s('notes').isEmpty ? '' : 'Extra notes from the candidate: ${s('notes')}\n'}"
+              'Candidate details:\n${s('details')}\n'
+              'Return a JSON object with EXACTLY these keys: '
+              '"personal" {"fullName","title","email","phone","location","linkedin","github","portfolio"}, '
+              '"summary" (string, 3-4 sentences), '
+              '"skills" (array of strings, each formatted as "Category: skill, skill, skill"), '
+              '"projects" (array of {"name","description","link"}), '
+              '"experience" (array of {"title","company","startDate","endDate","bullets":[string]}), '
+              '"education" (array of {"degree","school","startDate","endDate"}). '
+              'Use empty strings/arrays where unknown.',
+          true
+        );
       case AiFeature.bulletImprover:
         return (
           'You are an expert resume writer.\n'
@@ -245,6 +268,45 @@ class AiService {
             'Skilled at collaborating across teams, simplifying complex problems, and shipping '
             'production-quality work. Eager to bring strong technical fundamentals and a growth '
             'mindset to a high-performing team.';
+      case AiFeature.fullResume:
+        final title = (ctx['jobTitle'] ?? 'Professional').toString();
+        return jsonEncode({
+          'personal': {
+            'fullName': '',
+            'title': title,
+            'email': '',
+            'phone': '',
+            'location': '',
+            'linkedin': '',
+            'github': '',
+            'portfolio': '',
+          },
+          'summary': 'Motivated $title with hands-on experience and a track record of delivering '
+              'measurable results. Combines strong fundamentals with clear communication and a '
+              'bias for shipping. Seeking to bring reliable, high-quality work to a growing team.',
+          'skills': [
+            'Core: Problem solving, Communication, Teamwork',
+            'Tools: Git, Excel, Project management',
+          ],
+          'projects': [
+            {'name': 'Sample Project', 'description': 'Built and shipped a small end-to-end project demonstrating core skills.', 'link': ''},
+          ],
+          'experience': [
+            {
+              'title': title,
+              'company': 'Recent role',
+              'startDate': '2024',
+              'endDate': 'Present',
+              'bullets': [
+                'Delivered key tasks on time, improving team output by an estimated 20%.',
+                'Collaborated across functions to resolve issues and streamline workflows.',
+              ],
+            },
+          ],
+          'education': [
+            {'degree': 'Relevant qualification', 'school': 'University', 'startDate': '', 'endDate': '2024'},
+          ],
+        });
       case AiFeature.bulletImprover:
         final original = (ctx['bullet'] ?? '').toString();
         return original.isEmpty
