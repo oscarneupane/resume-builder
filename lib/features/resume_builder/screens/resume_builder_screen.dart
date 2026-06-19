@@ -210,7 +210,7 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
                   Expanded(
                     child: _step == _stepNames.length - 1
                         ? AppButton(
-                            label: _generatingAll ? 'Generating…' : 'Generate with AI',
+                            label: _generatingAll ? 'Generating…' : 'Generate',
                             icon: Icons.auto_awesome,
                             loading: _generatingAll,
                             onPressed: () => _generateFullResume(c),
