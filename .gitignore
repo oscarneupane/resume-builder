@@ -15,6 +15,9 @@ ios/.symlinks/
 android/key.properties
 android/app/*.jks
 
-# Stray IntelliJ Java project accidentally created inside the repo (not part of the app)
-ApplyMate/
+# Stray IntelliJ Java project accidentally created inside the repo (not part of the app).
+# Anchored to repo root with a leading slash: an unanchored "ApplyMate/" also
+# matches android/.../com/example/applymate/ on case-insensitive filesystems
+# (Windows/macOS), which silently ignored MainActivity.kt and broke the build.
+/ApplyMate/
 
