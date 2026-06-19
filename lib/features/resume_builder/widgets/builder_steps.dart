@@ -425,6 +425,69 @@ class _SkillsStepState extends State<SkillsStep> {
   }
 }
 
+/// Final step — turn everything entered into a finished resume. Collects the
+/// target role (defaults to the entered title) and optional notes; the bottom
+/// "Generate with AI" button runs the generation.
+class GenerateStep extends StatelessWidget {
+  final ResumeBuilderController c;
+  const GenerateStep(this.c, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        const Center(child: Icon(Icons.auto_awesome, size: 48, color: AppColors.primary)),
+        const SizedBox(height: 12),
+        Text('Generate your resume', textAlign: TextAlign.center, style: context.text.titleLarge),
+        const SizedBox(height: 6),
+        Text(
+          'AI turns everything you entered into a polished, ATS-ready resume — '
+          'sharper wording, grouped skills, and strong bullet points. It uses '
+          'your real details only and won’t invent jobs or dates.',
+          textAlign: TextAlign.center,
+          style: context.text.bodySmall,
+        ),
+        const SizedBox(height: 20),
+        AppTextField(
+          label: 'Target role',
+          hint: 'e.g. IT Support Officer',
+          initialValue: c.aiTargetRole.isNotEmpty ? c.aiTargetRole : c.title,
+          onChanged: (v) => c.aiTargetRole = v,
+        ),
+        const SizedBox(height: 12),
+        AppTextField(
+          label: 'Anything else? (optional)',
+          hint: 'Tone, focus areas, target company…',
+          maxLines: 4,
+          initialValue: c.aiNotes,
+          onChanged: (v) => c.aiNotes = v,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.lightbulb_outline, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Tap “Generate with AI” below to create your resume.',
+                    style: context.text.bodySmall),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Step 5 — Extras: certifications + languages.
 class ExtrasStep extends StatefulWidget {
   final ResumeBuilderController c;

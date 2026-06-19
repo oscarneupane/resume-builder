@@ -103,6 +103,10 @@ class ResumeBuilderController extends ChangeNotifier {
 
   String template = AppConstants.defaultTemplate;
 
+  // Inputs for the final "Generate with AI" step (transient — not persisted).
+  String aiTargetRole = '';
+  String aiNotes = '';
+
   /// Set once the draft has been persisted to Supabase, so subsequent saves
   /// update the same row instead of creating duplicates.
   String? savedResumeId;

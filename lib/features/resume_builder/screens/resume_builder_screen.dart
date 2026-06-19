@@ -31,7 +31,7 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
   bool _saving = false;
   final _personalFormKey = GlobalKey<FormState>();
 
-  static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Projects', 'Skills', 'Extras'];
+  static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Projects', 'Skills', 'Extras', 'Generate'];
 
   Future<void> _saveDraft(ResumeBuilderController c) async {
     if (!SupabaseService.isConfigured) {
@@ -73,19 +73,18 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
     }
   }
 
-  /// AI writes a complete resume from whatever the user has entered so far,
-  /// formatted into the app's single ATS layout. Enriches wording — does not
-  /// invent employers/schools/dates (enforced in the prompt).
+  /// Final step action: AI turns everything entered into a complete resume in
+  /// the app's single ATS layout, then opens the preview. Enriches wording —
+  /// does not invent employers/schools/dates (enforced in the prompt).
   Future<void> _generateFullResume(ResumeBuilderController c) async {
-    final input = await _showGenerateDialog(c);
-    if (input == null) return;
+    final role = c.aiTargetRole.trim().isNotEmpty ? c.aiTargetRole.trim() : c.title.trim();
 
     setState(() => _generatingAll = true);
     final res = await AiService.instance.generate(
       feature: AiFeature.fullResume,
       context: {
-        'jobTitle': input.$1,
-        'notes': input.$2,
+        'jobTitle': role,
+        'notes': c.aiNotes.trim(),
         'details': c.aiDetails(),
       },
     );
@@ -114,49 +113,6 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
     }
   }
 
-  /// Collects a target role (defaults to the entered title) and optional notes.
-  Future<(String, String)?> _showGenerateDialog(ResumeBuilderController c) {
-    final roleCtrl = TextEditingController(text: c.title);
-    final notesCtrl = TextEditingController();
-    return showDialog<(String, String)>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Generate with AI'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'AI will write a complete resume from the details you’ve entered, '
-              'using real facts only — it won’t invent jobs or dates.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: roleCtrl,
-              decoration: const InputDecoration(labelText: 'Target role', hintText: 'e.g. IT Support Officer'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: notesCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Anything else? (optional)',
-                hintText: 'Tone, focus areas, target company…',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, (roleCtrl.text.trim(), notesCtrl.text.trim())),
-            child: const Text('Generate'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _onNext() {
     // Step 0 (Personal) gates on required fields.
     if (_step == 0) {
@@ -166,11 +122,7 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
         return;
       }
     }
-    if (_step == _stepNames.length - 1) {
-      context.push(AppRoutes.resumePreview);
-    } else {
-      setState(() => _step++);
-    }
+    setState(() => _step++);
   }
 
   Future<void> _suggestSkills(ResumeBuilderController c) async {
@@ -207,14 +159,6 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
             child: Text(_saving ? 'Saving…' : 'Save Draft'),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _generatingAll ? null : () => _generateFullResume(c),
-        icon: _generatingAll
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.auto_awesome),
-        label: Text(_generatingAll ? 'Writing…' : 'Generate with AI'),
-        backgroundColor: AppColors.primary,
       ),
       body: SafeArea(
         child: Column(
@@ -264,10 +208,17 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
                     ),
                   if (_step > 0) const SizedBox(width: 12),
                   Expanded(
-                    child: AppButton(
-                      label: _step == _stepNames.length - 1 ? 'Preview Resume' : 'Next',
-                      onPressed: () => _onNext(),
-                    ),
+                    child: _step == _stepNames.length - 1
+                        ? AppButton(
+                            label: _generatingAll ? 'Generating…' : 'Generate with AI',
+                            icon: Icons.auto_awesome,
+                            loading: _generatingAll,
+                            onPressed: () => _generateFullResume(c),
+                          )
+                        : AppButton(
+                            label: 'Next',
+                            onPressed: () => _onNext(),
+                          ),
                   ),
                 ],
               ),
@@ -294,6 +245,8 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
         return SkillsStep(c, onAiSuggest: () => _suggestSkills(c), aiLoading: _skillsLoading);
       case 6:
         return ExtrasStep(c);
+      case 7:
+        return GenerateStep(c);
     }
     return const SizedBox.shrink();
   }
