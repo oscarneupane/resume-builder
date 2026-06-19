@@ -394,12 +394,31 @@ class AiService {
     );
   }
 
+  /// Scan a job posting (screenshot/photo/PDF/pasted text) into structured
+  /// fields used to pre-fill the cover-letter builder. The applicant's own
+  /// details are supplied separately (saved Materials / profile).
+  Future<AiResult> scanJobPost({Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
+    return _extract(
+      imageBytes: imageBytes,
+      pdfBytes: pdfBytes,
+      text: text,
+      structured: true,
+      prompt: 'Extract the job posting details from this document/image as a JSON object with '
+          'EXACTLY these keys: "jobTitle" (string), "companyName" (string), '
+          '"jobDescription" (string — a concise summary of the role’s responsibilities and '
+          'requirements), "keySkills" (array of strings — the most important skills/keywords). '
+          'Use empty strings/arrays where unknown. Do NOT invent details.',
+      mock: _mockJobScan,
+    );
+  }
+
   Future<AiResult> _extract({
     Uint8List? imageBytes,
     Uint8List? pdfBytes,
     String? text,
     required String prompt,
     required bool structured,
+    String? mock,
   }) async {
     // PDFs are rasterized to an image so the vision model can read them.
     Uint8List? image = imageBytes;
@@ -414,8 +433,17 @@ class AiService {
     if (key != null) {
       return _extractViaOpenAi(prompt: prompt, image: image, text: text, structured: structured, apiKey: key);
     }
-    return AiResult.ok(_mockExtraction(structured));
+    return AiResult.ok(mock ?? _mockExtraction(structured));
   }
+
+  String get _mockJobScan => jsonEncode({
+        'jobTitle': 'IT Support Officer',
+        'companyName': 'Northwind Technologies',
+        'jobDescription': 'Provide first-line technical support, troubleshoot hardware and '
+            'software issues, administer Active Directory accounts, and maintain Windows '
+            'devices. Looking for strong communication and a customer-first mindset.',
+        'keySkills': ['Help Desk', 'Active Directory', 'Windows', 'Troubleshooting', 'Customer service'],
+      });
 
   Future<Uint8List?> _pdfFirstPagePng(Uint8List pdf) async {
     try {
