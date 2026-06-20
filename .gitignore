@@ -21,3 +21,9 @@ android/app/*.jks
 # (Windows/macOS), which silently ignored MainActivity.kt and broke the build.
 /ApplyMate/
 
+
+# Machine-specific deploy helper (reads keys from .env at runtime)
+deploy_gemini.ps1
+
+# Supabase CLI scratch dir
+supabase/.temp/
