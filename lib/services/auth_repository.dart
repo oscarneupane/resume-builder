@@ -142,6 +142,28 @@ class AuthRepository {
     _mockController.add(const AuthEvent(userId: null, email: null, username: null));
   }
 
+  /// Permanently deletes the account. Real path calls the `delete_user` RPC
+  /// (SECURITY DEFINER; ON DELETE CASCADE clears all the user's rows) then signs
+  /// out. Mock path clears the local session.
+  Future<void> deleteAccount() async {
+    if (SupabaseService.isConfigured) {
+      final client = SupabaseService.instance.client;
+      try {
+        await client.rpc('delete_user');
+      } catch (e) {
+        throw AuthFailure('Could not delete account: $e');
+      }
+      await client.auth.signOut();
+      return;
+    }
+    await _storage.delete(key: _mockEmailKey);
+    await _storage.delete(key: _mockUsernameKey);
+    _mockUserId = null;
+    _mockEmail = null;
+    _mockUsername = null;
+    _mockController.add(const AuthEvent(userId: null, email: null, username: null));
+  }
+
   Future<void> sendPasswordReset(String email) async {
     if (SupabaseService.isConfigured) {
       await SupabaseService.instance.client.auth.resetPasswordForEmail(email);

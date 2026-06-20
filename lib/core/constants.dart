@@ -44,6 +44,7 @@ enum AiFeature {
   recruiterMessage,
   interviewQuestions,
   interviewAnswer,
+  interviewFeedback,
   skillsSuggest,
 }
 

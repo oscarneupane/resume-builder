@@ -250,6 +250,20 @@ class AiService {
               'Format as: Situation: ...\nTask: ...\nAction: ...\nResult: ...',
           false
         );
+      case AiFeature.interviewFeedback:
+        return (
+          'You are an experienced interview coach. Score and critique the '
+              "candidate's answer to an interview question.\n"
+              'Question: ${s('question')}\n'
+              'Job title: ${s('jobTitle')}\n'
+              "Candidate's answer: ${s('answer')}\n"
+              'Return a JSON object with EXACTLY these keys: '
+              '"score" (number 0-100), '
+              '"summary" (string, one or two sentences of overall feedback), '
+              '"strengths" (array of short strings), '
+              '"improvements" (array of short, specific, actionable strings).',
+          true
+        );
       case AiFeature.skillsSuggest:
         return (
           'Suggest 10 relevant resume skills for the job title: ${s('jobTitle')}.\n'
@@ -355,6 +369,17 @@ class AiService {
             'Task: What you needed to achieve.\n'
             'Action: The specific steps you took.\n'
             'Result: The measurable outcome.';
+      case AiFeature.interviewFeedback:
+        return jsonEncode({
+          'score': 78,
+          'summary': 'Solid, relevant answer with a clear example — tighten the structure and quantify the result.',
+          'strengths': ['Stayed on topic', 'Used a concrete example'],
+          'improvements': [
+            'Open with the situation in one sentence so the listener has context.',
+            'Quantify the outcome (e.g. “cut response time 30%”).',
+            'End by linking the result back to the role you are applying for.',
+          ],
+        });
       case AiFeature.skillsSuggest:
         return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability']);
     }
