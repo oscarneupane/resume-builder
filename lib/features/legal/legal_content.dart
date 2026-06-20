@@ -38,8 +38,9 @@ const privacyPolicySections = <LegalSection>[
   ),
   LegalSection(
     'AI processing',
-    'When you use an AI feature, the relevant content is sent to our AI provider (OpenAI) solely to '
-        'generate your result. We log only usage counts for rate limiting — not the content of your requests.',
+    'When you use an AI feature, the relevant content is sent to our AI provider (Google’s Gemini API) '
+        'solely to generate your result. We log only usage counts for rate limiting — not the content of your '
+        'requests.',
   ),
   LegalSection(
     'Storage & security',
