@@ -1,10 +1,15 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
 import '../../../models/document_model.dart';
+import '../../../services/ai_service.dart';
 import '../../../services/documents_repository.dart';
 import '../../../services/pdf_service.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -97,13 +102,48 @@ class _InputForm extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
+        // Primary path: screenshot a job ad → AI writes the letter from it + your details.
+        AppButton(
+          label: 'Scan a job post',
+          icon: Icons.document_scanner_outlined,
+          onPressed: () => _scanJobPost(context, ref, c),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            'Screenshot a job ad — AI reads it and writes the letter using your saved details.',
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(children: [
+          const Expanded(child: Divider()),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text('or fill in manually', style: context.text.bodySmall),
+          ),
+          const Expanded(child: Divider()),
+        ]),
+        const SizedBox(height: 16),
         _BackgroundPicker(c: c, parentRef: ref),
         const SizedBox(height: 12),
-        AppTextField(label: 'Job title', initialValue: c.jobTitle, onChanged: c.setJobTitle),
-        const SizedBox(height: 12),
-        AppTextField(label: 'Company name', initialValue: c.companyName, onChanged: c.setCompanyName),
+        AppTextField(
+          key: ValueKey('cl-title-${c.jobTitle.hashCode}'),
+          label: 'Job title',
+          initialValue: c.jobTitle,
+          onChanged: c.setJobTitle,
+        ),
         const SizedBox(height: 12),
         AppTextField(
+          key: ValueKey('cl-company-${c.companyName.hashCode}'),
+          label: 'Company name',
+          initialValue: c.companyName,
+          onChanged: c.setCompanyName,
+        ),
+        const SizedBox(height: 12),
+        AppTextField(
+          key: ValueKey('cl-skills-${c.skills.hashCode}'),
           label: 'Key skills (optional)',
           hint: 'e.g. Flutter, leadership, data analysis',
           initialValue: c.skills,
@@ -111,6 +151,7 @@ class _InputForm extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         AppTextField(
+          key: ValueKey('cl-jd-${c.jobDescription.hashCode}'),
           label: 'Job description (optional)',
           hint: 'Paste the JD to tailor the letter',
           maxLines: 5,
@@ -287,6 +328,147 @@ class _LetterTab extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Lets the user pick a job-post source (screenshot/photo, PDF, or pasted text),
+/// then scans it and writes the cover letter in one go.
+Future<void> _scanJobPost(BuildContext context, WidgetRef ref, CoverLetterController c) async {
+  await showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (sheetCtx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Scan a job post from…', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+            title: const Text('Screenshot or photo'),
+            onTap: () async {
+              Navigator.pop(sheetCtx);
+              final x = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+              if (x == null) return;
+              final bytes = await x.readAsBytes();
+              if (context.mounted) {
+                await _runJobScan(context, ref, c, () => AiService.instance.scanJobPost(imageBytes: bytes));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.picture_as_pdf_outlined, color: AppColors.primary),
+            title: const Text('PDF'),
+            onTap: () async {
+              Navigator.pop(sheetCtx);
+              final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
+              if (r == null || r.files.isEmpty || r.files.first.bytes == null) return;
+              if (context.mounted) {
+                await _runJobScan(context, ref, c, () => AiService.instance.scanJobPost(pdfBytes: r.files.first.bytes!));
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.notes_outlined, color: AppColors.primary),
+            title: const Text('Paste text'),
+            onTap: () async {
+              Navigator.pop(sheetCtx);
+              final text = await _pasteJobDialog(context);
+              if (text == null || text.trim().isEmpty) return;
+              if (context.mounted) {
+                await _runJobScan(context, ref, c, () => AiService.instance.scanJobPost(text: text));
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _runJobScan(
+  BuildContext context,
+  WidgetRef ref,
+  CoverLetterController c,
+  Future<AiResult> Function() scan,
+) async {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(
+      child: Card(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4)),
+            SizedBox(width: 14),
+            Text('Reading the job post…'),
+          ]),
+        ),
+      ),
+    ),
+  );
+
+  final res = await scan();
+  if (!res.isOk || res.text == null) {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) context.showSnack(res.error ?? 'Could not read the job post.');
+    return;
+  }
+
+  Map<String, dynamic> data;
+  try {
+    data = jsonDecode(res.text!) as Map<String, dynamic>;
+  } catch (_) {
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) context.showSnack('Could not read the job post. Try a clearer screenshot.');
+    return;
+  }
+
+  c.applyJobScan(data);
+
+  // "The app has your details": attach your most recent saved material as
+  // background so the letter is personalised without re-entering anything.
+  final mats = ref.read(materialsControllerProvider).materials;
+  if (c.backgroundLabel == null && mats.isNotEmpty) {
+    c.attachBackground(mats.first.title, mats.first.extractedText);
+  }
+
+  // Enough to write the letter → do it now (one tap from screenshot to result).
+  if (c.canGenerate) await c.generate();
+
+  if (context.mounted) Navigator.of(context, rootNavigator: true).pop(); // close progress
+  if (!context.mounted) return;
+  if (c.result == null) {
+    context.showSnack(c.canGenerate
+        ? (c.error ?? 'Could not write the letter. Try again.')
+        : 'Scanned — add the job title and company, then tap Generate.');
+  }
+}
+
+Future<String?> _pasteJobDialog(BuildContext context) async {
+  final ctrl = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (dctx) => AlertDialog(
+      title: const Text('Paste the job post'),
+      content: TextField(
+        controller: ctrl,
+        maxLines: 8,
+        decoration: const InputDecoration(hintText: 'Paste the job ad / description here…'),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(dctx, ctrl.text), child: const Text('Scan')),
+      ],
+    ),
+  );
 }
 
 class _ErrorBox extends StatelessWidget {

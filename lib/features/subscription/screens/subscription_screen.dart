@@ -57,19 +57,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
               borderRadius: BorderRadius.circular(AppRadii.card),
             ),
-            child: Column(
+            child: const Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(Icons.star_rounded, color: AppColors.proGold),
                     SizedBox(width: 8),
                     Text('ApplyMate Pro',
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 22)),
                   ],
                 ),
-                const SizedBox(height: 6),
-                const Text('AUD \$14.99 / month — 7-day free trial',
+                SizedBox(height: 6),
+                Text('AUD \$14.99 / month — 7-day free trial',
                     style: TextStyle(color: Color(0xFFB7CDEB))),
               ],
             ),

@@ -19,7 +19,7 @@ class ProGate extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: AppColors.proGold.withOpacity(0.15), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: AppColors.proGold.withValues(alpha: 0.15), shape: BoxShape.circle),
               child: const Icon(Icons.star_rounded, size: 36, color: AppColors.proGold),
             ),
             const SizedBox(height: 16),

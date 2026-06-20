@@ -38,10 +38,10 @@ class SupabaseService {
       return;
     }
     // supabase_flutter 2.x renamed `anonKey` to `publishableKey` — still
-    // backed by the same value (sb_publishable_…/anon JWT). Use a try-catch to
-    // remain compatible with both 2.5 (anonKey) and 2.x post-rename.
+    // backed by the same value (sb_publishable_…/anon JWT). The try-catch keeps
+    // init failures from leaving the service marked as configured.
     try {
-      await Supabase.initialize(url: url, anonKey: key);
+      await Supabase.initialize(url: url, publishableKey: key);
     } catch (_) {
       _configured = false;
       rethrow;

@@ -20,9 +20,9 @@ class AppConstants {
   static const prefHasOnboarded = 'has_onboarded';
   static const prefOnboardingPayload = 'onboarding_payload';
 
-  // Resume templates
-  static const defaultTemplate = 'classic';
-  static const availableTemplates = ['classic', 'modern', 'minimal'];
+  // Resume output format. A single clean, ATS-friendly layout — content is
+  // generated/enriched by AI rather than chosen from visual templates.
+  static const defaultTemplate = 'ats';
 
   // ATS thresholds
   static const atsThresholdGood = 75;
@@ -35,6 +35,7 @@ enum Plan { free, pro }
 /// AI features that go through the rate-limited edge function.
 enum AiFeature {
   professionalSummary,
+  fullResume,
   bulletImprover,
   atsCheck,
   coverLetter,
@@ -43,6 +44,7 @@ enum AiFeature {
   recruiterMessage,
   interviewQuestions,
   interviewAnswer,
+  interviewFeedback,
   skillsSuggest,
 }
 

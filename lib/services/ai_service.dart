@@ -13,10 +13,11 @@ import 'supabase_service.dart';
 ///
 ///   1. Supabase Edge Function  — when Supabase is configured. Most secure;
 ///      the OpenAI key lives server-side and rate limiting is enforced.
-///   2. Direct OpenAI call       — when OPENAI_API_KEY is set in `.env`. Lets the
-///      app produce real ChatGPT output during MVP/dev before the backend is
-///      deployed. NOTE: the key ships inside the app, so use this for testing
-///      only — production should rely on tier 1.
+///   2. Direct AI provider       — when a provider key is set in `.env`
+///      (Gemini / OpenRouter / OpenAI, all OpenAI-compatible). Lets the app
+///      produce real output during MVP/dev before the backend is deployed.
+///      Free providers win over OpenAI. NOTE: the key ships inside the app, so
+///      use this for testing only — production should rely on tier 1.
 ///   3. Deterministic mock       — when neither is available, so UI flows still work.
 ///
 /// Edge routing: `atsCheck` → `ats-check`, `coverLetter` → `cover-letter`,
@@ -31,15 +32,39 @@ class AiService {
         _ => AppConstants.fnAiGenerate,
       };
 
-  /// OPENAI_API_KEY from `.env`, or null if absent/placeholder.
-  String? get _openAiKey {
+  /// A non-empty, non-placeholder key from `.env`, or null.
+  String? _key(String name) {
     try {
-      final k = dotenv.env['OPENAI_API_KEY'];
-      if (k == null || k.isEmpty || k.startsWith('sk-your') || k.startsWith('your-')) return null;
-      return k;
+      final k = dotenv.env[name];
+      if (k == null || k.trim().isEmpty) return null;
+      final low = k.toLowerCase();
+      if (low.startsWith('your-') || low.startsWith('sk-your') || low.contains('placeholder')) return null;
+      return k.trim();
     } catch (_) {
       return null;
     }
+  }
+
+  /// The active "direct" AI provider, selected by which key is set in `.env`.
+  /// All three speak the OpenAI chat-completions format. Free providers
+  /// (Gemini, OpenRouter) are preferred so a free key takes over a
+  /// quota-blocked OpenAI key without any code change.
+  _AiProvider? get _provider {
+    final gemini = _key('GEMINI_API_KEY');
+    if (gemini != null) {
+      return const _AiProvider('Gemini', 'https://generativelanguage.googleapis.com/v1beta/openai')
+          .withKey(gemini, 'gemini-flash-latest');
+    }
+    final openrouter = _key('OPENROUTER_API_KEY');
+    if (openrouter != null) {
+      return const _AiProvider('OpenRouter', 'https://openrouter.ai/api/v1')
+          .withKey(openrouter, 'google/gemini-2.0-flash-exp:free');
+    }
+    final openai = _key('OPENAI_API_KEY');
+    if (openai != null) {
+      return const _AiProvider('OpenAI', 'https://api.openai.com/v1').withKey(openai, 'gpt-4o');
+    }
+    return null;
   }
 
   Future<AiResult> generate({
@@ -50,9 +75,10 @@ class AiService {
     if (SupabaseService.isConfigured) {
       return _viaEdgeFunction(feature, context);
     }
-    // Tier 2 — direct OpenAI (MVP/dev).
-    if (_openAiKey != null) {
-      return _viaOpenAi(feature, context, _openAiKey!);
+    // Tier 2 — direct AI provider (Gemini / OpenRouter / OpenAI).
+    final provider = _provider;
+    if (provider != null) {
+      return _viaProvider(feature, context, provider);
     }
     // Tier 3 — mock.
     return AiResult.ok(_mockResponse(feature, context));
@@ -91,17 +117,20 @@ class AiService {
   }
 
   // ── Tier 2 ────────────────────────────────────────────────────────────────
-  Future<AiResult> _viaOpenAi(AiFeature feature, Map<String, dynamic> context, String apiKey) async {
+  Future<AiResult> _viaProvider(AiFeature feature, Map<String, dynamic> context, _AiProvider p) async {
     final (prompt, wantsJson) = _buildPrompt(feature, context);
     try {
       final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        Uri.parse('${p.baseUrl}/chat/completions'),
         headers: {
-          'Authorization': 'Bearer $apiKey',
+          'Authorization': 'Bearer ${p.key}',
           'Content-Type': 'application/json',
+          // OpenRouter likes these for attribution (optional, harmless elsewhere).
+          'HTTP-Referer': 'https://applymate.app',
+          'X-Title': 'ApplyMate',
         },
         body: jsonEncode({
-          'model': 'gpt-4o',
+          'model': p.model,
           'messages': [
             {'role': 'user', 'content': prompt}
           ],
@@ -110,10 +139,13 @@ class AiService {
       );
 
       if (res.statusCode == 401) {
-        return const AiResult.failure('OpenAI rejected the API key. Check OPENAI_API_KEY in .env.');
+        return AiResult.failure('${p.name} rejected the API key. Check your key in .env.');
+      }
+      if (res.statusCode == 429) {
+        return AiResult.failure('${p.name} is rate-limited or out of quota. Try again shortly or switch provider.');
       }
       if (res.statusCode >= 400) {
-        return AiResult.failure('OpenAI request failed (${res.statusCode}).');
+        return AiResult.failure('${p.name} request failed (${res.statusCode}).');
       }
 
       final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -132,7 +164,7 @@ class AiService {
       }
       return AiResult.ok(content);
     } catch (e) {
-      return AiResult.failure('OpenAI request error: $e');
+      return AiResult.failure('${p.name} request error: $e');
     }
   }
 
@@ -151,6 +183,29 @@ class AiService {
               "Write in first person without using 'I'. Be specific and impactful. "
               'Return ONLY the summary text, no preamble.',
           false
+        );
+      case AiFeature.fullResume:
+        return (
+          'You are an expert resume writer and career coach.\n'
+              'Using ONLY the candidate details below, produce a complete, polished, '
+              'ATS-friendly resume. Improve the wording, write strong action-verb '
+              'bullet points with quantified impact where plausible, group technical '
+              'skills by category, and write concise one-line project descriptions.\n'
+              'Do NOT invent employers, schools, job titles, dates, or contact details '
+              'that are not present in the details — only enrich the wording around the '
+              'real facts. If a section has no source data, return it empty.\n'
+              'Target role: ${s('jobTitle')}\n'
+              "${s('notes').isEmpty ? '' : 'Extra notes from the candidate: ${s('notes')}\n'}"
+              'Candidate details:\n${s('details')}\n'
+              'Return a JSON object with EXACTLY these keys: '
+              '"personal" {"fullName","title","email","phone","location","linkedin","github","portfolio"}, '
+              '"summary" (string, 3-4 sentences), '
+              '"skills" (array of strings, each formatted as "Category: skill, skill, skill"), '
+              '"projects" (array of {"name","description","link"}), '
+              '"experience" (array of {"title","company","startDate","endDate","bullets":[string]}), '
+              '"education" (array of {"degree","school","startDate","endDate"}). '
+              'Use empty strings/arrays where unknown.',
+          true
         );
       case AiFeature.bulletImprover:
         return (
@@ -227,6 +282,20 @@ class AiService {
               'Format as: Situation: ...\nTask: ...\nAction: ...\nResult: ...',
           false
         );
+      case AiFeature.interviewFeedback:
+        return (
+          'You are an experienced interview coach. Score and critique the '
+              "candidate's answer to an interview question.\n"
+              'Question: ${s('question')}\n'
+              'Job title: ${s('jobTitle')}\n'
+              "Candidate's answer: ${s('answer')}\n"
+              'Return a JSON object with EXACTLY these keys: '
+              '"score" (number 0-100), '
+              '"summary" (string, one or two sentences of overall feedback), '
+              '"strengths" (array of short strings), '
+              '"improvements" (array of short, specific, actionable strings).',
+          true
+        );
       case AiFeature.skillsSuggest:
         return (
           'Suggest 10 relevant resume skills for the job title: ${s('jobTitle')}.\n'
@@ -245,6 +314,45 @@ class AiService {
             'Skilled at collaborating across teams, simplifying complex problems, and shipping '
             'production-quality work. Eager to bring strong technical fundamentals and a growth '
             'mindset to a high-performing team.';
+      case AiFeature.fullResume:
+        final title = (ctx['jobTitle'] ?? 'Professional').toString();
+        return jsonEncode({
+          'personal': {
+            'fullName': '',
+            'title': title,
+            'email': '',
+            'phone': '',
+            'location': '',
+            'linkedin': '',
+            'github': '',
+            'portfolio': '',
+          },
+          'summary': 'Motivated $title with hands-on experience and a track record of delivering '
+              'measurable results. Combines strong fundamentals with clear communication and a '
+              'bias for shipping. Seeking to bring reliable, high-quality work to a growing team.',
+          'skills': [
+            'Core: Problem solving, Communication, Teamwork',
+            'Tools: Git, Excel, Project management',
+          ],
+          'projects': [
+            {'name': 'Sample Project', 'description': 'Built and shipped a small end-to-end project demonstrating core skills.', 'link': ''},
+          ],
+          'experience': [
+            {
+              'title': title,
+              'company': 'Recent role',
+              'startDate': '2024',
+              'endDate': 'Present',
+              'bullets': [
+                'Delivered key tasks on time, improving team output by an estimated 20%.',
+                'Collaborated across functions to resolve issues and streamline workflows.',
+              ],
+            },
+          ],
+          'education': [
+            {'degree': 'Relevant qualification', 'school': 'University', 'startDate': '', 'endDate': '2024'},
+          ],
+        });
       case AiFeature.bulletImprover:
         final original = (ctx['bullet'] ?? '').toString();
         return original.isEmpty
@@ -293,6 +401,17 @@ class AiService {
             'Task: What you needed to achieve.\n'
             'Action: The specific steps you took.\n'
             'Result: The measurable outcome.';
+      case AiFeature.interviewFeedback:
+        return jsonEncode({
+          'score': 78,
+          'summary': 'Solid, relevant answer with a clear example — tighten the structure and quantify the result.',
+          'strengths': ['Stayed on topic', 'Used a concrete example'],
+          'improvements': [
+            'Open with the situation in one sentence so the listener has context.',
+            'Quantify the outcome (e.g. “cut response time 30%”).',
+            'End by linking the result back to the role you are applying for.',
+          ],
+        });
       case AiFeature.skillsSuggest:
         return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability']);
     }
@@ -332,12 +451,31 @@ class AiService {
     );
   }
 
+  /// Scan a job posting (screenshot/photo/PDF/pasted text) into structured
+  /// fields used to pre-fill the cover-letter builder. The applicant's own
+  /// details are supplied separately (saved Materials / profile).
+  Future<AiResult> scanJobPost({Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
+    return _extract(
+      imageBytes: imageBytes,
+      pdfBytes: pdfBytes,
+      text: text,
+      structured: true,
+      prompt: 'Extract the job posting details from this document/image as a JSON object with '
+          'EXACTLY these keys: "jobTitle" (string), "companyName" (string), '
+          '"jobDescription" (string — a concise summary of the role’s responsibilities and '
+          'requirements), "keySkills" (array of strings — the most important skills/keywords). '
+          'Use empty strings/arrays where unknown. Do NOT invent details.',
+      mock: _mockJobScan,
+    );
+  }
+
   Future<AiResult> _extract({
     Uint8List? imageBytes,
     Uint8List? pdfBytes,
     String? text,
     required String prompt,
     required bool structured,
+    String? mock,
   }) async {
     // PDFs are rasterized to an image so the vision model can read them.
     Uint8List? image = imageBytes;
@@ -348,12 +486,21 @@ class AiService {
     if (SupabaseService.isConfigured) {
       return _extractViaEdge(prompt: prompt, image: image, text: text, structured: structured);
     }
-    final key = _openAiKey;
-    if (key != null) {
-      return _extractViaOpenAi(prompt: prompt, image: image, text: text, structured: structured, apiKey: key);
+    final provider = _provider;
+    if (provider != null) {
+      return _extractViaProvider(prompt: prompt, image: image, text: text, structured: structured, provider: provider);
     }
-    return AiResult.ok(_mockExtraction(structured));
+    return AiResult.ok(mock ?? _mockExtraction(structured));
   }
+
+  String get _mockJobScan => jsonEncode({
+        'jobTitle': 'IT Support Officer',
+        'companyName': 'Northwind Technologies',
+        'jobDescription': 'Provide first-line technical support, troubleshoot hardware and '
+            'software issues, administer Active Directory accounts, and maintain Windows '
+            'devices. Looking for strong communication and a customer-first mindset.',
+        'keySkills': ['Help Desk', 'Active Directory', 'Windows', 'Troubleshooting', 'Customer service'],
+      });
 
   Future<Uint8List?> _pdfFirstPagePng(Uint8List pdf) async {
     try {
@@ -391,12 +538,12 @@ class AiService {
     return AiResult.ok((jsonDecode(res.body)['result'] as String?) ?? '');
   }
 
-  Future<AiResult> _extractViaOpenAi({
+  Future<AiResult> _extractViaProvider({
     required String prompt,
     Uint8List? image,
     String? text,
     required bool structured,
-    required String apiKey,
+    required _AiProvider provider,
   }) async {
     final content = <Map<String, dynamic>>[
       {'type': 'text', 'text': text == null || text.trim().isEmpty ? prompt : '$prompt\n\nSOURCE:\n$text'},
@@ -408,10 +555,15 @@ class AiService {
     ];
     try {
       final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {'Authorization': 'Bearer $apiKey', 'Content-Type': 'application/json'},
+        Uri.parse('${provider.baseUrl}/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer ${provider.key}',
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://applymate.app',
+          'X-Title': 'ApplyMate',
+        },
         body: jsonEncode({
-          'model': 'gpt-4o',
+          'model': provider.model,
           'messages': [
             {'role': 'user', 'content': content}
           ],
@@ -419,9 +571,9 @@ class AiService {
         }),
       );
       if (res.statusCode == 401) {
-        return const AiResult.failure('OpenAI rejected the API key. Check OPENAI_API_KEY in .env.');
+        return AiResult.failure('${provider.name} rejected the API key. Check your key in .env.');
       }
-      if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode}).');
+      if (res.statusCode >= 400) return AiResult.failure('Scan failed (${provider.name} ${res.statusCode}).');
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final out = (body['choices']?[0]?['message']?['content'] as String?)?.trim() ?? '';
       return AiResult.ok(out);
@@ -475,4 +627,16 @@ class AiResult {
   const AiResult.failure(String error, {bool rateLimited = false}) : this._(null, error, rateLimited);
 
   bool get isOk => error == null;
+}
+
+/// A "direct" AI provider that speaks the OpenAI chat-completions format
+/// (OpenAI, OpenRouter, or Gemini's OpenAI-compatible endpoint).
+class _AiProvider {
+  final String name;
+  final String baseUrl;
+  final String key;
+  final String model;
+  const _AiProvider(this.name, this.baseUrl, {this.key = '', this.model = ''});
+
+  _AiProvider withKey(String key, String model) => _AiProvider(name, baseUrl, key: key, model: model);
 }

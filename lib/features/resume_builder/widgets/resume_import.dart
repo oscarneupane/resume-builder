@@ -49,7 +49,7 @@ Future<void> showResumeImportSheet(BuildContext context, WidgetRef ref) async {
               Navigator.pop(sheetCtx);
               final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
               if (r == null || r.files.isEmpty || r.files.first.bytes == null) return;
-              await _run(context, ref, () => AiService.instance.scanToResume(pdfBytes: r.files.first.bytes!));
+              if (context.mounted) await _run(context, ref, () => AiService.instance.scanToResume(pdfBytes: r.files.first.bytes!));
             },
           ),
           ListTile(
@@ -59,7 +59,7 @@ Future<void> showResumeImportSheet(BuildContext context, WidgetRef ref) async {
               Navigator.pop(sheetCtx);
               final text = await _pasteDialog(context);
               if (text == null || text.trim().isEmpty) return;
-              await _run(context, ref, () => AiService.instance.scanToResume(text: text));
+              if (context.mounted) await _run(context, ref, () => AiService.instance.scanToResume(text: text));
             },
           ),
           ListTile(
