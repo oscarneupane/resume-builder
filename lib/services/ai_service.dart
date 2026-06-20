@@ -105,7 +105,7 @@ class AiService {
 
     if (res.statusCode == 429) {
       return const AiResult.failure(
-        'Free plan limit reached (3/week). Upgrade to Pro for unlimited.',
+        'AI is busy right now — please try again in a moment.',
         rateLimited: true,
       );
     }
@@ -532,7 +532,7 @@ class AiService {
       }),
     );
     if (res.statusCode == 429) {
-      return const AiResult.failure('Free plan limit reached (3/week). Upgrade to Pro.', rateLimited: true);
+      return const AiResult.failure('AI is busy right now — please try again in a moment.', rateLimited: true);
     }
     if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode})');
     return AiResult.ok((jsonDecode(res.body)['result'] as String?) ?? '');

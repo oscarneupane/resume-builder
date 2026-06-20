@@ -1,4 +1,4 @@
-package com.example.applymate
+package com.applymate.app
 
 import io.flutter.embedding.android.FlutterActivity
 

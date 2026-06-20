@@ -6,6 +6,7 @@ import '../../../shared/utils/validators.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../controllers/resume_builder_controller.dart';
+import 'address_field.dart';
 
 // NOTE on state: text fields write to the model directly in onChanged WITHOUT
 // calling notifyListeners. That avoids rebuilding the step on every keystroke
@@ -53,13 +54,7 @@ class PersonalStep extends StatelessWidget {
             validator: Validators.phone,
           ),
           const SizedBox(height: 12),
-          AppTextField(
-            label: 'Location / address *',
-            hint: 'City, Country',
-            initialValue: c.location,
-            onChanged: (v) => c.location = v,
-            validator: (v) => Validators.required(v, 'Location'),
-          ),
+          AddressField(c),
           const SizedBox(height: 12),
           AppTextField(label: 'LinkedIn URL', initialValue: c.linkedin, onChanged: (v) => c.linkedin = v),
           const SizedBox(height: 12),

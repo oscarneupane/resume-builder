@@ -153,7 +153,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _GroupCard(
             title: 'Account',
             children: [
-              _SettingRow(icon: Icons.workspace_premium_outlined, label: 'Subscription', onTap: () => context.push(AppRoutes.subscription)),
               _SettingRow(icon: Icons.lock_outline, label: 'Change password', onTap: () => context.showSnack('Password reset coming soon')),
             ],
           ),

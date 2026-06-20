@@ -120,13 +120,6 @@ class ProfileTabScreen extends ConsumerWidget {
           const SizedBox(height: 20),
           const _SectionLabel('Account'),
           _QuickTile(icon: Icons.settings_outlined, title: 'Settings', onTap: () => context.push(AppRoutes.settings)),
-          const SizedBox(height: 10),
-          _QuickTile(
-            icon: Icons.workspace_premium_outlined,
-            title: 'Subscription',
-            subtitle: 'Manage your plan or start the 7-day Pro trial.',
-            onTap: () => context.push(AppRoutes.subscription),
-          ),
           const SizedBox(height: 20),
           const _SectionLabel('Tools'),
           _QuickTile(icon: Icons.work_history_outlined, title: 'Job Tracker', onTap: () => context.push(AppRoutes.jobTracker)),
