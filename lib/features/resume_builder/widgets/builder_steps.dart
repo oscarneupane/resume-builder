@@ -171,7 +171,14 @@ class SummaryStep extends StatelessWidget {
 /// Step 2 — Work experience (repeating).
 class ExperienceStep extends StatelessWidget {
   final ResumeBuilderController c;
-  const ExperienceStep(this.c, {super.key});
+
+  /// Called to AI-improve a single bullet (experience entry + bullet index).
+  final void Function(ExperienceEntry e, int bulletIndex)? onImproveBullet;
+
+  /// Key of the bullet currently being improved (so its button shows a spinner).
+  final String? improvingBulletKey;
+
+  const ExperienceStep(this.c, {super.key, this.onImproveBullet, this.improvingBulletKey});
 
   @override
   Widget build(BuildContext context) {
@@ -252,6 +259,8 @@ class ExperienceStep extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextFormField(
+                      // Re-seed when AI rewrites the bullet (content hash changes).
+                      key: ValueKey('exp-$i-bullet-$b-${e.bullets[b].hashCode}'),
                       initialValue: e.bullets[b],
                       maxLines: 2,
                       minLines: 1,
@@ -259,6 +268,17 @@ class ExperienceStep extends StatelessWidget {
                       onChanged: (v) => e.bullets[b] = v,
                     ),
                   ),
+                  if (onImproveBullet != null)
+                    (improvingBulletKey == 'exp-$i-bullet-$b')
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : IconButton(
+                            tooltip: 'AI improve',
+                            icon: const Icon(Icons.auto_awesome, size: 20, color: AppColors.primary),
+                            onPressed: e.bullets[b].trim().isEmpty ? null : () => onImproveBullet!(e, b),
+                          ),
                   IconButton(
                     icon: const Icon(Icons.remove_circle_outline, size: 20),
                     onPressed: e.bullets.length > 1 ? () => c.update(() => e.bullets.removeAt(b)) : null,
