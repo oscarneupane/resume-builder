@@ -53,7 +53,7 @@ class AiService {
     final gemini = _key('GEMINI_API_KEY');
     if (gemini != null) {
       return const _AiProvider('Gemini', 'https://generativelanguage.googleapis.com/v1beta/openai')
-          .withKey(gemini, 'gemini-2.0-flash');
+          .withKey(gemini, 'gemini-flash-latest');
     }
     final openrouter = _key('OPENROUTER_API_KEY');
     if (openrouter != null) {
