@@ -21,9 +21,6 @@ import '../features/resume_builder/screens/resume_builder_screen.dart';
 import '../features/resume_builder/screens/resume_list_screen.dart';
 import '../features/resume_builder/screens/resume_preview_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
-import '../features/subscription/screens/payment_failed_screen.dart';
-import '../features/subscription/screens/payment_success_screen.dart';
-import '../features/subscription/screens/subscription_screen.dart';
 
 class AppRoutes {
   static const splash = '/';
@@ -50,9 +47,6 @@ class AppRoutes {
   static const settings = '/settings';
   static const privacy = '/privacy';
   static const terms = '/terms';
-  static const subscription = '/subscription';
-  static const paymentSuccess = '/payment-success';
-  static const paymentFailed = '/payment-failed';
 }
 
 /// Whether onboarding is complete. Seeded synchronously from SharedPreferences
@@ -122,9 +116,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: AppRoutes.settings, builder: (_, __) => const SettingsScreen()),
       GoRoute(path: AppRoutes.privacy, builder: (_, __) => const LegalScreen(doc: LegalDoc.privacy)),
       GoRoute(path: AppRoutes.terms, builder: (_, __) => const LegalScreen(doc: LegalDoc.terms)),
-      GoRoute(path: AppRoutes.subscription, builder: (_, __) => const SubscriptionScreen()),
-      GoRoute(path: AppRoutes.paymentSuccess, builder: (_, __) => const PaymentSuccessScreen()),
-      GoRoute(path: AppRoutes.paymentFailed, builder: (_, __) => const PaymentFailedScreen()),
     ],
   );
 });

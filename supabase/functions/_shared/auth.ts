@@ -34,18 +34,12 @@ export async function requireUser(req: Request): Promise<AuthContext> {
 }
 
 /**
- * Enforces the free-plan rate limit (3 AI generations / rolling week).
- * Pro users are unlimited. Returns true if allowed.
+ * Soft per-user AI cap. The app is free (no paid tier), so this is only abuse
+ * protection for the shared AI quota — not a paywall. Generous limit.
  */
+const WEEKLY_AI_LIMIT = 100;
+
 export async function checkRateLimit(ctx: AuthContext): Promise<boolean> {
-  const { data: sub } = await ctx.svc
-    .from('subscriptions')
-    .select('plan')
-    .eq('user_id', ctx.userId)
-    .single();
-
-  if (sub?.plan === 'pro') return true;
-
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { count } = await ctx.svc
     .from('ai_generation_logs')
@@ -53,7 +47,7 @@ export async function checkRateLimit(ctx: AuthContext): Promise<boolean> {
     .eq('user_id', ctx.userId)
     .gte('created_at', weekAgo);
 
-  return (count ?? 0) < 3;
+  return (count ?? 0) < WEEKLY_AI_LIMIT;
 }
 
 export async function logUsage(ctx: AuthContext, feature: string, tokens?: number) {

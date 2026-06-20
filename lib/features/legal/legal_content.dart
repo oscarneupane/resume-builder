@@ -32,9 +32,9 @@ const privacyPolicySections = <LegalSection>[
   ),
   LegalSection(
     'How we use your information',
-    'To provide the app’s features: building documents, AI generation, ATS checks, storage, and '
-        'subscriptions. We use your content only to deliver the result you asked for. We do not sell your '
-        'data, and we do not use your resume content to train AI models.',
+    'To provide the app’s features: building documents, AI generation, ATS checks, and storage. '
+        'We use your content only to deliver the result you asked for. We do not sell your data, and we do '
+        'not use your resume content to train AI models.',
   ),
   LegalSection(
     'AI processing',
@@ -87,9 +87,8 @@ const termsSections = <LegalSection>[
         'before using it in real applications. We do not guarantee any particular hiring outcome.',
   ),
   LegalSection(
-    'Subscriptions & billing',
-    'Pro features are offered on a subscription with a free trial. Charges, renewals and cancellations '
-        'are handled by the payment provider and any applicable app-store billing terms.',
+    'Cost',
+    'ApplyMate is currently free to use. There are no in-app purchases or subscriptions.',
   ),
   LegalSection(
     'Disclaimer & liability',
