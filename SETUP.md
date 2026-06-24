@@ -16,30 +16,29 @@ offline for development. Add keys to switch features to live data.
 
 ---
 
-## 1. OpenAI — make the AI actually work (quickest win)
+## 1. AI keys — production-safe setup
 
-This powers AI summary, ATS check, cover letters, LinkedIn, interview answers,
-and the "scan a file/photo" import.
+AI provider keys belong in **Supabase Edge Function secrets**, not in Flutter.
+Mobile apps can be decompiled, so shipping `OPENAI_API_KEY` or `CLAUDE_API_KEY`
+inside `.env` is not safe for production.
 
-1. Go to <https://platform.openai.com> → **Settings → API keys → Create new secret key**.
-2. Set up billing (**Settings → Billing**) — the key won't work without credit. Set a low usage limit while testing.
-3. In `.env`, replace the placeholder value (keep the name):
+Use:
 
-   ```env
-   OPENAI_API_KEY=sk-your-real-key
-   ```
-   No quotes, no spaces around `=`. Any value starting with `sk-your` is treated as "not set".
+- **Claude API** for planning/writing: summaries, bullets, LinkedIn, interview
+  prep, skills, cover letters.
+- **OpenAI API** for vision/extraction/ATS: uploaded files/photos and ATS JSON.
 
-4. **Rebuild:** stop the app, then `flutter run` (hot reload is not enough).
+Set them server-side:
 
-How it routes (see `lib/services/ai_service.dart`):
-`Supabase configured → Edge Function` → else `OPENAI_API_KEY set → call OpenAI directly` → else `mock`.
+```bash
+supabase secrets set \
+  CLAUDE_API_KEY=sk-ant-... \
+  CLAUDE_MODEL=claude-3-5-sonnet-20241022 \
+  OPENAI_API_KEY=sk-...
+```
 
-> ⚠️ A key in `.env` is **bundled into the app build** — fine for dev/testing, **not** for a
-> public release. For production, deploy the Edge Functions and store the key as a
-> Supabase secret instead (see below). Keep `SUPABASE_URL`/`SUPABASE_ANON_KEY` as
-> placeholders while using the direct-OpenAI path, or the app will call the
-> (not-yet-deployed) Edge Functions.
+If Supabase is not configured, the app uses deterministic mock AI responses so
+screens are still testable.
 
 ---
 
@@ -57,6 +56,7 @@ How it routes (see `lib/services/ai_service.dart`):
    ```bash
    supabase link --project-ref <your-project-ref>
    supabase db push
+   supabase functions deploy ai-plan
    supabase functions deploy ai-generate
    supabase functions deploy ats-check
    supabase functions deploy cover-letter
@@ -64,10 +64,11 @@ How it routes (see `lib/services/ai_service.dart`):
    supabase functions deploy create-checkout
    supabase functions deploy stripe-webhook --no-verify-jwt
    ```
-4. Set server-side secrets (the OpenAI key lives here in production, never in the app):
+4. Set server-side secrets:
 
    ```bash
-   supabase secrets set OPENAI_API_KEY=sk-... STRIPE_SECRET_KEY=sk_test_... \
+   supabase secrets set CLAUDE_API_KEY=sk-ant-... OPENAI_API_KEY=sk-... \
+     STRIPE_SECRET_KEY=sk_test_... \
      STRIPE_WEBHOOK_SECRET=whsec_... STRIPE_PRICE_ID=price_...
    ```
 5. **Google sign-in:** enable the Google provider in Supabase and add the
@@ -110,7 +111,8 @@ described in `supabase/README.md`.
 
 | Key | Where it's safe | Needed for |
 |-----|-----------------|-----------|
-| `OPENAI_API_KEY` | App `.env` (dev only) **or** Supabase secret (prod) | All AI features |
+| `CLAUDE_API_KEY` | Supabase secret only | AI planning/writing |
+| `OPENAI_API_KEY` | Supabase secret only | File/photo extraction, ATS |
 | `SUPABASE_URL` | App `.env` (public) | Auth, DB, storage, server AI |
 | `SUPABASE_ANON_KEY` | App `.env` (public, safe with RLS) | Same as above |
 | `STRIPE_PUBLISHABLE_KEY` | App `.env` (public) | Checkout |

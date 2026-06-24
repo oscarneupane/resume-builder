@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme.dart';
 
@@ -41,23 +42,21 @@ class AppButton extends StatelessWidget {
             ],
           );
 
+    void handleTap() {
+      if (onPressed == null || loading) return;
+      HapticFeedback.lightImpact();
+      onPressed!();
+    }
+
     Widget button;
     switch (variant) {
       case AppButtonVariant.primary:
-        button = ElevatedButton(onPressed: loading ? null : onPressed, child: child);
+        button = ElevatedButton(onPressed: loading ? null : handleTap, child: child);
         break;
       case AppButtonVariant.secondary:
-        button = OutlinedButton(onPressed: loading ? null : onPressed, child: child);
+        button = OutlinedButton(onPressed: loading ? null : handleTap, child: child);
         break;
       case AppButtonVariant.danger:
         button = ElevatedButton(
-          onPressed: loading ? null : onPressed,
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-          child: child,
-        );
-        break;
-    }
-
-    return fullWidth ? SizedBox(width: double.infinity, child: button) : button;
-  }
-}
+          onPressed: loading ? null : handleTap,
+          style: ElevatedButton.styleFrom(backg

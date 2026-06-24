@@ -18,3 +18,7 @@ android/app/*.jks
 # Stray IntelliJ Java project accidentally created inside the repo (not part of the app)
 ApplyMate/
 
+# Local machine-specific deploy helper
+deploy_supabase.ps1
+
+# L

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,11 +15,11 @@ class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.child});
 
   static const _tabs = [
-    (AppRoutes.dashboard, 'Home', Icons.home_outlined, Icons.home),
-    (AppRoutes.docs, 'My Docs', Icons.folder_outlined, Icons.folder),
-    (AppRoutes.create, 'Create', Icons.add_circle_outline, Icons.add_circle),
-    (AppRoutes.resources, 'Resources', Icons.menu_book_outlined, Icons.menu_book),
-    (AppRoutes.profile, 'Profile', Icons.person_outline, Icons.person),
+    (AppRoutes.dashboard, 'Home',     Icons.home_outlined,         Icons.home_rounded),
+    (AppRoutes.docs,      'My Docs',  Icons.folder_outlined,       Icons.folder_rounded),
+    (AppRoutes.create,    'Create',   Icons.add_circle_outline,    Icons.add_circle_rounded),
+    (AppRoutes.resources, 'Resources',Icons.menu_book_outlined,    Icons.menu_book_rounded),
+    (AppRoutes.profile,   'Profile',  Icons.person_outline_rounded,Icons.person_rounded),
   ];
 
   int _indexFor(String location) {
@@ -34,13 +35,23 @@ class HomeShell extends ConsumerWidget {
     final idx = _indexFor(location);
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: idx,
-        onTap: (i) => context.go(_tabs[i].$1),
-        items: [
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: idx,
+        onDestinationSelected: (i) {
+          HapticFeedback.selectionClick();
+          context.go(_tabs[i].$1);
+        },
+        backgroundColor: AppColors.background,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.12),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        destinations: [
           for (var i = 0; i < _tabs.length; i++)
-            BottomNavigationBarItem(
-              icon: Icon(i == idx ? _tabs[i].$4 : _tabs[i].$3),
+            NavigationDestination(
+              icon: Icon(_tabs[i].$3, color: AppColors.textSecondary),
+              selectedIcon: Icon(_tabs[i].$4, color: AppColors.primary),
               label: _tabs[i].$2,
             ),
         ],
@@ -57,34 +68,137 @@ class DashboardTab extends StatelessWidget {
 
 class QuickCreateScreen extends StatelessWidget {
   const QuickCreateScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Create')),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xl),
         children: [
-          _QuickTile(
+          Text('What would you like to create?',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 20),
+          _CreateCard(
             icon: Icons.description_outlined,
+            color: AppColors.primary,
             title: 'New Resume',
             subtitle: 'Start from scratch or duplicate an existing one.',
+            badge: 'AI-powered',
             onTap: () => context.push(AppRoutes.resumeBuilder),
           ),
           const SizedBox(height: 12),
-          _QuickTile(
+          _CreateCard(
             icon: Icons.mail_outline,
-            title: 'New Cover Letter',
+            color: const Color(0xFF0F766E),
+            title: 'Cover Letter',
             subtitle: 'AI-generated, three tones, three formats.',
+            badge: 'AI-powered',
             onTap: () => context.push(AppRoutes.coverLetter),
           ),
           const SizedBox(height: 12),
-          _QuickTile(
+          _CreateCard(
             icon: Icons.verified_outlined,
-            title: 'New ATS Check',
+            color: const Color(0xFF7C3AED),
+            title: 'ATS Check',
             subtitle: 'Paste a job description and score your resume.',
             onTap: () => context.push(AppRoutes.ats),
           ),
+          const SizedBox(height: 12),
+          _CreateCard(
+            icon: Icons.psychology_outlined,
+            color: const Color(0xFFB45309),
+            title: 'Interview Prep',
+            subtitle: 'Practice questions with AI feedback.',
+            onTap: () => context.push(AppRoutes.interview),
+          ),
+          const SizedBox(height: 12),
+          _CreateCard(
+            icon: Icons.connect_without_contact,
+            color: const Color(0xFF0369A1),
+            title: 'LinkedIn Summary',
+            subtitle: 'Write a headline and summary that gets noticed.',
+            onTap: () => context.push(AppRoutes.linkedin),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _CreateCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final String? badge;
+  final VoidCallback onTap;
+  const _CreateCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    this.badge,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(title, style: Theme.of(context).textTheme.titleLarge),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(badge!, style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.textSecondary),
+          ],
+        ),
       ),
     );
   }
@@ -154,123 +268,4 @@ class ProfileHeaderCard extends StatelessWidget {
     final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, Color(0xFF2E5191)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white,
-            child: Text(_initials, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 22)),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name.capitalized, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: context.text.titleLarge?.copyWith(color: Colors.white, fontSize: 20)),
-                if (email != null) ...[
-                  const SizedBox(height: 2),
-                  Text(email!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFFB7CDEB), fontSize: 13)),
-                ],
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isPro ? AppColors.proGold : Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(isPro ? Icons.star_rounded : Icons.bolt_outlined, size: 14, color: Colors.white),
-                      const SizedBox(width: 4),
-                      Text(isPro ? 'PRO' : 'Free plan',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10, left: 4),
-        child: Text(text.toUpperCase(),
-            style: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-      );
-}
-
-class _QuickTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback onTap;
-  const _QuickTile({required this.icon, required this.title, this.subtitle, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.cardSurface,
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: AppColors.primary),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: context.text.titleLarge),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(subtitle!, style: context.text.bodySmall),
-                  ],
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-          ],
-        ),
-      ),
-    );
-  }
-}
+    return (parts.first.

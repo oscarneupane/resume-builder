@@ -9,238 +9,377 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants.dart';
 import 'supabase_service.dart';
 
-/// Routes AI requests with a three-tier priority ("Both" mode):
+/// Multi-provider AI routing with automatic fallback.
 ///
-///   1. Supabase Edge Function  — when Supabase is configured. Most secure;
-///      the OpenAI key lives server-side and rate limiting is enforced.
-///   2. Direct OpenAI call       — when OPENAI_API_KEY is set in `.env`. Lets the
-///      app produce real ChatGPT output during MVP/dev before the backend is
-///      deployed. NOTE: the key ships inside the app, so use this for testing
-///      only — production should rely on tier 1.
-///   3. Deterministic mock       — when neither is available, so UI flows still work.
+/// Priority chain (first available key wins):
+///   1. Supabase Edge Functions — production path, keys stored as Supabase secrets.
+///   2. Claude (Anthropic)     — claude-haiku-4-5, best quality.
+///   3. DeepSeek               — deepseek-chat, free tier, OpenAI-compatible.
+///   4. Groq                   — llama-3.1-8b-instant, free & fast.
+///   5. Gemini                 — gemini-2.0-flash, Google free tier.
+///   6. Mock                   — deterministic offline fallback.
 ///
-/// Edge routing: `atsCheck` → `ats-check`, `coverLetter` → `cover-letter`,
-/// everything else → `ai-generate`.
+/// Set keys in your .env file (see .env.example).
+/// For production: store keys as Supabase Edge Function secrets — never ship
+/// AI provider keys inside the mobile bundle.
 class AiService {
   AiService._();
   static final instance = AiService._();
 
+  // ── Key helpers ────────────────────────────────────────────────────────────
+
+  String? get _claudeKey   => _key('CLAUDE_API_KEY');
+  String? get _deepseekKey => _key('DEEPSEEK_API_KEY');
+  String? get _groqKey     => _key('GROQ_API_KEY');
+  String? get _geminiKey   => _key('GEMINI_API_KEY');
+
+  String? _key(String name) {
+    final v = dotenv.env[name];
+    return (v == null || v.isEmpty || v.startsWith('your-')) ? null : v;
+  }
+
   String _endpointFor(AiFeature feature) => switch (feature) {
-        AiFeature.atsCheck => AppConstants.fnAtsCheck,
+        AiFeature.atsCheck    => AppConstants.fnAtsCheck,
         AiFeature.coverLetter => AppConstants.fnCoverLetter,
-        _ => AppConstants.fnAiGenerate,
+        _                     => AppConstants.fnAiPlan,
       };
 
-  /// OPENAI_API_KEY from `.env`, or null if absent/placeholder.
-  String? get _openAiKey {
-    try {
-      final k = dotenv.env['OPENAI_API_KEY'];
-      if (k == null || k.isEmpty || k.startsWith('sk-your') || k.startsWith('your-')) return null;
-      return k;
-    } catch (_) {
-      return null;
-    }
-  }
+  // ── Public API ─────────────────────────────────────────────────────────────
 
   Future<AiResult> generate({
     required AiFeature feature,
     required Map<String, dynamic> context,
   }) async {
-    // Tier 1 — secure Edge Function.
+    // 1. Supabase Edge Functions (production)
     if (SupabaseService.isConfigured) {
-      return _viaEdgeFunction(feature, context);
+      final r = await _viaEdgeFunction(feature, context);
+      if (r.isOk) return r;
     }
-    // Tier 2 — direct OpenAI (MVP/dev).
-    if (_openAiKey != null) {
-      return _viaOpenAi(feature, context, _openAiKey!);
+
+    final (prompt, wantsJson) = _buildPrompt(feature, context);
+
+    // 2. Claude (Anthropic)
+    if (_claudeKey != null) {
+      final r = await _viaClaude(prompt, wantsJson, _claudeKey!);
+      if (r.isOk) return r;
     }
-    // Tier 3 — mock.
+
+    // 3. DeepSeek (Chinese free API, OpenAI-compatible)
+    if (_deepseekKey != null) {
+      final r = await _viaOpenAICompat(
+        prompt, wantsJson, _deepseekKey!,
+        baseUrl: 'https://api.deepseek.com',
+        model: 'deepseek-chat',
+        provider: 'DeepSeek',
+      );
+      if (r.isOk) return r;
+    }
+
+    // 4. Groq (free, OpenAI-compatible)
+    if (_groqKey != null) {
+      final r = await _viaOpenAICompat(
+        prompt, wantsJson, _groqKey!,
+        baseUrl: 'https://api.groq.com/openai',
+        model: 'llama-3.1-8b-instant',
+        provider: 'Groq',
+      );
+      if (r.isOk) return r;
+    }
+
+    // 5. Gemini (Google free tier)
+    if (_geminiKey != null) {
+      final r = await _viaGemini(prompt, _geminiKey!);
+      if (r.isOk) return r;
+    }
+
+    // 6. Mock fallback
     return AiResult.ok(_mockResponse(feature, context));
   }
 
-  // ── Tier 1 ────────────────────────────────────────────────────────────────
-  Future<AiResult> _viaEdgeFunction(AiFeature feature, Map<String, dynamic> context) async {
+  // ── Tier 1 — Supabase Edge Functions ──────────────────────────────────────
+
+  Future<AiResult> _viaEdgeFunction(
+      AiFeature feature, Map<String, dynamic> context) async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return const AiResult.failure('Not signed in.');
 
     final url = dotenv.env['SUPABASE_URL'];
-    final endpoint = Uri.parse('$url/functions/v1/${_endpointFor(feature)}');
-    final isDedicated = feature == AiFeature.atsCheck || feature == AiFeature.coverLetter;
-    final payload = isDedicated ? context : {'feature': feature.name, 'context': context};
+    final endpoint =
+        Uri.parse('$url/functions/v1/${_endpointFor(feature)}');
+    final isDedicated =
+        feature == AiFeature.atsCheck || feature == AiFeature.coverLetter;
+    final payload =
+        isDedicated ? context : {'feature': feature.name, 'context': context};
 
-    final res = await http.post(
-      endpoint,
-      headers: {
-        'Authorization': 'Bearer ${session.accessToken}',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(payload),
-    );
-
-    if (res.statusCode == 429) {
-      return const AiResult.failure(
-        'Free plan limit reached (3/week). Upgrade to Pro for unlimited.',
-        rateLimited: true,
-      );
-    }
-    if (res.statusCode >= 400) {
-      return AiResult.failure('AI request failed (${res.statusCode})');
-    }
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return AiResult.ok((body['result'] as String?) ?? '');
-  }
-
-  // ── Tier 2 ────────────────────────────────────────────────────────────────
-  Future<AiResult> _viaOpenAi(AiFeature feature, Map<String, dynamic> context, String apiKey) async {
-    final (prompt, wantsJson) = _buildPrompt(feature, context);
     try {
-      final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': 'gpt-4o',
-          'messages': [
-            {'role': 'user', 'content': prompt}
-          ],
-          if (wantsJson) 'response_format': {'type': 'json_object'},
-        }),
-      );
+      final res = await http
+          .post(
+            endpoint,
+            headers: {
+              'Authorization': 'Bearer ${session.accessToken}',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      if (res.statusCode == 401) {
-        return const AiResult.failure('OpenAI rejected the API key. Check OPENAI_API_KEY in .env.');
-      }
       if (res.statusCode == 429) {
         return const AiResult.failure(
-            'OpenAI quota exceeded. Add credit/billing at platform.openai.com → Settings → Billing.');
+          'Free plan limit reached (3/week). Upgrade to Pro for unlimited.',
+          rateLimited: true,
+        );
       }
       if (res.statusCode >= 400) {
-        return AiResult.failure('OpenAI request failed (${res.statusCode}).');
+        final detail = res.body.isEmpty ? '' : ': ${res.body}';
+        return AiResult.failure('Edge function error (${res.statusCode})$detail');
       }
-
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final content = (body['choices']?[0]?['message']?['content'] as String?)?.trim() ?? '';
-
-      // Normalize list-style features to a bare JSON array string (client parses a List).
-      if (feature == AiFeature.skillsSuggest || feature == AiFeature.interviewQuestions) {
-        final key = feature == AiFeature.skillsSuggest ? 'skills' : 'questions';
-        try {
-          final parsed = jsonDecode(content);
-          final list = parsed is List ? parsed : (parsed[key] ?? []);
-          return AiResult.ok(jsonEncode(list));
-        } catch (_) {
-          return const AiResult.ok('[]');
-        }
-      }
-      return AiResult.ok(content);
+      return AiResult.ok((body['result'] as String?) ?? '');
     } catch (e) {
-      return AiResult.failure('OpenAI request error: $e');
+      return AiResult.failure('Edge function unavailable: $e');
     }
   }
 
-  /// Dart-side prompt templates (mirror supabase/functions/_shared/openai.ts).
-  (String, bool) _buildPrompt(AiFeature feature, Map<String, dynamic> c) {
-    String s(String k) => (c[k] ?? '').toString();
+  // ── Tier 2a — Claude (Anthropic) ──────────────────────────────────────────
+
+  Future<AiResult> _viaClaude(
+      String prompt, bool wantsJson, String apiKey) async {
+    try {
+      final body = {
+        'model': 'claude-haiku-4-5',
+        'max_tokens': 1024,
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+      };
+
+      final res = await http
+          .post(
+            Uri.parse('https://api.anthropic.com/v1/messages'),
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 401) {
+        return const AiResult.failure('Claude: invalid API key. Check CLAUDE_API_KEY in .env.');
+      }
+      if (res.statusCode == 429) {
+        return const AiResult.failure('Claude: rate limit hit.', rateLimited: true);
+      }
+      if (res.statusCode >= 400) {
+        return AiResult.failure('Claude error (${res.statusCode})');
+      }
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final text = (data['content'] as List?)
+          ?.whereType<Map>()
+          .where((b) => b['type'] == 'text')
+          .map((b) => b['text'] as String)
+          .join('') ?? '';
+      return AiResult.ok(text.trim());
+    } catch (e) {
+      return AiResult.failure('Claude unavailable: $e');
+    }
+  }
+
+  // ── Tier 2b — OpenAI-compatible (DeepSeek / Groq) ─────────────────────────
+
+  Future<AiResult> _viaOpenAICompat(
+    String prompt,
+    bool wantsJson,
+    String apiKey, {
+    required String baseUrl,
+    required String model,
+    required String provider,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'model': model,
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+        'max_tokens': 1024,
+        if (wantsJson) 'response_format': {'type': 'json_object'},
+      };
+
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/v1/chat/completions'),
+            headers: {
+              'Authorization': 'Bearer $apiKey',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 401) {
+        return AiResult.failure(
+            '$provider: invalid API key. Check ${provider.toUpperCase()}_API_KEY in .env.');
+      }
+      if (res.statusCode == 429) {
+        return AiResult.failure('$provider: rate limit hit.', rateLimited: true);
+      }
+      if (res.statusCode >= 400) {
+        return AiResult.failure('$provider error (${res.statusCode}): ${res.body}');
+      }
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final text = (data['choices'] as List?)
+              ?.firstOrNull?['message']?['content'] as String? ?? '';
+      return AiResult.ok(text.trim());
+    } catch (e) {
+      return AiResult.failure('$provider unavailable: $e');
+    }
+  }
+
+  // ── Tier 2d — Gemini (Google) ─────────────────────────────────────────────
+
+  Future<AiResult> _viaGemini(String prompt, String apiKey) async {
+    try {
+      const model = 'gemini-2.0-flash';
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+      );
+
+      final res = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt}
+                  ]
+                }
+              ],
+              'generationConfig': {'maxOutputTokens': 1024, 'temperature': 0.7},
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 400) {
+        return const AiResult.failure('Gemini: invalid request or API key.');
+      }
+      if (res.statusCode == 429) {
+        return const AiResult.failure('Gemini: rate limit hit.', rateLimited: true);
+      }
+      if (res.statusCode >= 400) {
+        return AiResult.failure('Gemini error (${res.statusCode})');
+      }
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final text = (data['candidates'] as List?)
+              ?.firstOrNull?['content']?['parts']
+              ?.firstOrNull?['text'] as String? ??
+          '';
+      return AiResult.ok(text.trim());
+    } catch (e) {
+      return AiResult.failure('Gemini unavailable: $e');
+    }
+  }
+
+  // ── Prompt builder ─────────────────────────────────────────────────────────
+
+  (String prompt, bool wantsJson) _buildPrompt(
+      AiFeature feature, Map<String, dynamic> ctx) {
     switch (feature) {
       case AiFeature.professionalSummary:
         return (
-          'You are a professional resume writer.\n'
-              'Write a 3-4 sentence professional summary for a resume.\n'
-              'Job title: ${s('jobTitle')}\n'
-              'Years of experience: ${s('yearsExp')}\n'
-              'Top skills: ${s('skills')}\n'
-              'Career goal: ${s('careerGoal')}\n'
-              "Write in first person without using 'I'. Be specific and impactful. "
-              'Return ONLY the summary text, no preamble.',
-          false
+          'Write a concise 3-sentence professional resume summary for a '
+          '${ctx['jobTitle'] ?? 'professional'}. Skills: ${ctx['skills'] ?? ''}. '
+          'Start with a strong action phrase. Be specific. No fluff.',
+          false,
         );
+
       case AiFeature.bulletImprover:
         return (
-          'You are an expert resume writer.\n'
-              'Rewrite this resume bullet point to be more impactful. Use strong action '
-              'verbs and quantify results where possible.\n'
-              'Original: ${s('bullet')}\n'
-              'Job title: ${s('jobTitle')}\n'
-              'Return ONLY the improved bullet point. No explanations.',
-          false
+          'Rewrite this resume bullet point to be stronger, more quantified, '
+          'and ATS-friendly. Return ONLY the improved bullet, no explanation.\n'
+          'Original: ${ctx['bullet']}',
+          false,
         );
+
       case AiFeature.atsCheck:
         return (
-          'You are an ATS expert. Analyze this resume against the job description.\n'
-              'RESUME: ${s('resumeText')}\n'
-              'JOB DESCRIPTION: ${s('jobDescription')}\n'
-              'Return a JSON object with these exact keys: '
-              '"score" (number 0-100), "matching_keywords" (string[]), '
-              '"missing_keywords" (string[]), "weak_sections" (string[]), '
-              '"suggestions" (array of { "section", "issue", "fix" }).',
-          true
+          'You are an ATS expert. Analyse this resume against the job description '
+          'and return a JSON object with EXACTLY these keys: '
+          '"score" (int 0-100), '
+          '"matching_keywords" (string array), '
+          '"missing_keywords" (string array), '
+          '"weak_sections" (string array), '
+          '"suggestions" (array of {"section","issue","fix"}). '
+          'Resume: ${ctx['resumeText']}\n'
+          'Job Description: ${ctx['jobDescription']}',
+          true,
         );
+
       case AiFeature.coverLetter:
-        final bg = s('background');
         return (
-          'You are a professional cover letter writer.\n'
-              'Write a ${s('tone')} cover letter for:\n'
-              'Job Title: ${s('jobTitle')}\n'
-              'Company: ${s('companyName')}\n'
-              'Applicant skills: ${s('skills')}\n'
-              'Job Description: ${s('jobDescription')}\n'
-              '${bg.isEmpty ? '' : 'Applicant background (use real details from this, do not invent):\n$bg\n'}'
-              'Return a JSON object with keys: full_letter, short_email, recruiter_msg.',
-          true
+          'Write a professional cover letter for the role of ${ctx['jobTitle'] ?? 'this position'} '
+          'at ${ctx['company'] ?? 'the company'}. '
+          'Tone: ${ctx['tone'] ?? 'professional'}. '
+          'Background: ${ctx['background'] ?? ''}. '
+          'Return a JSON object with keys: "full_letter", "short_email", "recruiter_msg".',
+          true,
         );
+
       case AiFeature.linkedinHeadline:
         return (
-          'Write 3 punchy LinkedIn headline options (max 120 chars each) for a '
-              '${s('jobTitle')} with ${s('yearsExp')} years of experience.\n'
-              'Skills: ${s('skills')}\n'
-              'Return each headline on its own line, no numbering or quotes.',
-          false
+          'Write 3 LinkedIn headline options for a ${ctx['jobTitle'] ?? 'professional'}. '
+          'Each should be under 120 characters, keyword-rich, and compelling. '
+          'Return each on its own line, no numbering.',
+          false,
         );
+
       case AiFeature.linkedinAbout:
         return (
-          'Write a compelling LinkedIn About section.\n'
-              'Name: ${s('name')} | Job Title: ${s('jobTitle')}\n'
-              'Skills: ${s('skills')} | Career Goal: ${s('goal')}\n'
-              'Max 300 words. Professional tone. First person.',
-          false
+          'Write a LinkedIn About section (first-person, 3 paragraphs) for a '
+          '${ctx['jobTitle'] ?? 'professional'} with background: ${ctx['background'] ?? ''}. '
+          'Make it engaging, keyword-rich, and end with a call to action.',
+          false,
         );
+
       case AiFeature.recruiterMessage:
         return (
-          'Write a short, friendly cold outreach message to a recruiter (max 90 '
-              'words) from a ${s('jobTitle')} with ${s('yearsExp')} years of experience.\n'
-              'Skills: ${s('skills')}\n'
-              'Polite, specific, and easy to reply to. Return only the message.',
-          false
+          'Write a short, friendly LinkedIn recruiter outreach message (under 300 chars) '
+          'for a ${ctx['jobTitle'] ?? 'professional'} interested in ${ctx['role'] ?? 'this role'}. '
+          'Include placeholders {recruiter} and {company}.',
+          false,
         );
+
       case AiFeature.interviewQuestions:
         return (
-          'Generate 10 realistic interview questions for a ${s('jobTitle')} role'
-              '${s('experienceLevel').isEmpty ? '' : ' (${s('experienceLevel')} level)'}.\n'
-              'Mix behavioral, technical, and role-specific.\n'
-              'Return a JSON object with a single key "questions" whose value is an array of 10 strings.',
-          true
+          'Generate 10 realistic interview questions for the role of '
+          '${ctx['jobTitle'] ?? 'professional'}. Mix behavioural and technical. '
+          'Return as a JSON array of strings.',
+          true,
         );
+
       case AiFeature.interviewAnswer:
         return (
-          'Generate a STAR-method interview answer.\n'
-              'Question: ${s('question')}\n'
-              'Job Title: ${s('jobTitle')}\n'
-              'My Experience: ${s('experience')}\n'
-              'Format as: Situation: ...\nTask: ...\nAction: ...\nResult: ...',
-          false
+          'Write a strong STAR-method answer to this interview question: "${ctx['question']}". '
+          'Keep it concise (under 200 words). Role: ${ctx['jobTitle'] ?? 'professional'}.',
+          false,
         );
+
       case AiFeature.skillsSuggest:
         return (
-          'Suggest 10 relevant resume skills for the job title: ${s('jobTitle')}.\n'
-              'Return a JSON object with a single key "skills" whose value is an array of strings.',
-          true
+          'List 8 in-demand skills for the role of ${ctx['jobTitle'] ?? 'professional'}. '
+          'Return as a JSON array of short skill strings (2-4 words max each).',
+          true,
         );
     }
   }
 
-  // ── Tier 3 ────────────────────────────────────────────────────────────────
+  // ── Tier 5 — Mock (offline fallback) ─────────────────────────────────────
+
   String _mockResponse(AiFeature feature, Map<String, dynamic> ctx) {
     switch (feature) {
       case AiFeature.professionalSummary:
@@ -249,11 +388,13 @@ class AiService {
             'Skilled at collaborating across teams, simplifying complex problems, and shipping '
             'production-quality work. Eager to bring strong technical fundamentals and a growth '
             'mindset to a high-performing team.';
+
       case AiFeature.bulletImprover:
         final original = (ctx['bullet'] ?? '').toString();
         return original.isEmpty
             ? 'Spearheaded a cross-functional initiative that reduced cycle time by 28% in one quarter.'
-            : 'Improved: $original — now with stronger action verb and quantified result (e.g. 25%).';
+            : 'Improved: $original — with stronger action verb and quantified result (e.g. +25%).';
+
       case AiFeature.atsCheck:
         return jsonEncode({
           'score': 72,
@@ -264,21 +405,29 @@ class AiService {
             {'section': 'summary', 'issue': 'Too generic', 'fix': 'Lead with role + years of experience.'}
           ]
         });
+
       case AiFeature.coverLetter:
         return jsonEncode({
           'full_letter': 'Dear Hiring Manager,\n\n[Generated cover letter draft]\n\nSincerely,',
           'short_email': 'Hi — quick note to express interest in the role...',
-          'recruiter_msg': 'Hi {recruiter}, saw the role — would love to chat.',
+          'recruiter_msg': 'Hi {recruiter}, saw the role at {company} — would love to chat.',
         });
+
       case AiFeature.linkedinHeadline:
         return 'Software Engineer | Flutter & Dart | Building delightful mobile apps\n'
             'Mobile Developer turning ideas into shipped products\n'
             'Engineer • Problem solver • Lifelong learner';
+
       case AiFeature.linkedinAbout:
-        return 'Builder, learner, shipper. I help teams turn ambiguous problems into clear plans...';
+        return 'Builder, learner, shipper. I help teams turn ambiguous problems into clear plans '
+            'and great products.\n\nWith experience across mobile and web, I bring technical depth '
+            'and product thinking to every project.\n\nAlways open to interesting conversations — '
+            'feel free to connect.';
+
       case AiFeature.recruiterMessage:
-        return 'Hi {recruiter}, I came across the {role} opening and it lines up well with my '
-            'experience in {skills}. I would love to learn more — open to a quick chat this week?';
+        return 'Hi {recruiter}, I came across the {role} opening at {company} and it lines up '
+            'well with my experience. Would love to learn more — open for a quick chat?';
+
       case AiFeature.interviewQuestions:
         return jsonEncode([
           'Tell me about yourself and your background.',
@@ -292,21 +441,23 @@ class AiService {
           'How do you handle feedback?',
           'Where do you see yourself in five years?',
         ]);
+
       case AiFeature.interviewAnswer:
         return 'Situation: Briefly set the context.\n'
             'Task: What you needed to achieve.\n'
             'Action: The specific steps you took.\n'
             'Result: The measurable outcome.';
+
       case AiFeature.skillsSuggest:
-        return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability']);
+        return jsonEncode(['Communication', 'Problem solving', 'Leadership', 'Adaptability',
+            'Project management', 'Data analysis', 'Team collaboration', 'Critical thinking']);
     }
   }
 
-  // ── Extraction (upload → AI scan) ───────────────────────────────────────────
+  // ── Document extraction (resume import) ────────────────────────────────────
 
-  /// Scan a source into a concise plain-text summary (stored on a Material and
-  /// reused as generation context).
-  Future<AiResult> scanToSummary({Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
+  Future<AiResult> scanToSummary(
+      {Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
     return _extract(
       imageBytes: imageBytes,
       pdfBytes: pdfBytes,
@@ -314,13 +465,12 @@ class AiService {
       structured: false,
       prompt: 'Extract the key professional information from this document as clean, '
           'concise plain text: full name, contact details, job titles & companies with '
-          'dates, education, and skills. Be faithful to the source and do NOT invent '
-          'anything. If a section is absent, omit it.',
+          'dates, education, and skills. Be faithful to the source. Do NOT invent anything.',
     );
   }
 
-  /// Scan a source into structured resume JSON used to pre-fill the builder.
-  Future<AiResult> scanToResume({Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
+  Future<AiResult> scanToResume(
+      {Uint8List? imageBytes, Uint8List? pdfBytes, String? text}) {
     return _extract(
       imageBytes: imageBytes,
       pdfBytes: pdfBytes,
@@ -343,19 +493,32 @@ class AiService {
     required String prompt,
     required bool structured,
   }) async {
-    // PDFs are rasterized to an image so the vision model can read them.
     Uint8List? image = imageBytes;
     if (image == null && pdfBytes != null) {
       image = await _pdfFirstPagePng(pdfBytes);
     }
 
     if (SupabaseService.isConfigured) {
-      return _extractViaEdge(prompt: prompt, image: image, text: text, structured: structured);
+      final r = await _extractViaEdge(
+          prompt: prompt, image: image, text: text, structured: structured);
+      if (r.isOk) return r;
     }
-    final key = _openAiKey;
-    if (key != null) {
-      return _extractViaOpenAi(prompt: prompt, image: image, text: text, structured: structured, apiKey: key);
+
+    // Direct Claude vision fallback (supports image input)
+    if (_claudeKey != null && image != null) {
+      final r = await _extractViaClaude(
+          prompt: prompt, image: image, apiKey: _claudeKey!);
+      if (r.isOk) return r;
     }
+
+    // Text-only fallback via any provider
+    if (text != null && text.trim().isNotEmpty) {
+      return generate(
+        feature: AiFeature.professionalSummary,
+        context: {'jobTitle': 'professional', 'text': text},
+      );
+    }
+
     return AiResult.ok(_mockExtraction(structured));
   }
 
@@ -364,7 +527,7 @@ class AiService {
       await for (final page in Printing.raster(pdf, pages: [0], dpi: 150)) {
         return page.toPng();
       }
-    } catch (_) {/* fall through */}
+    } catch (_) {}
     return null;
   }
 
@@ -377,64 +540,91 @@ class AiService {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return const AiResult.failure('Not signed in.');
     final url = dotenv.env['SUPABASE_URL'];
-    final endpoint = Uri.parse('$url/functions/v1/${AppConstants.fnAiExtract}');
-    final res = await http.post(
-      endpoint,
-      headers: {'Authorization': 'Bearer ${session.accessToken}', 'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'prompt': prompt,
-        'structured': structured,
-        if (image != null) 'image': base64Encode(image),
-        if (text != null && text.trim().isNotEmpty) 'text': text,
-      }),
-    );
-    if (res.statusCode == 429) {
-      return const AiResult.failure('Free plan limit reached (3/week). Upgrade to Pro.', rateLimited: true);
-    }
-    if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode})');
-    return AiResult.ok((jsonDecode(res.body)['result'] as String?) ?? '');
-  }
-
-  Future<AiResult> _extractViaOpenAi({
-    required String prompt,
-    Uint8List? image,
-    String? text,
-    required bool structured,
-    required String apiKey,
-  }) async {
-    final content = <Map<String, dynamic>>[
-      {'type': 'text', 'text': text == null || text.trim().isEmpty ? prompt : '$prompt\n\nSOURCE:\n$text'},
-      if (image != null)
-        {
-          'type': 'image_url',
-          'image_url': {'url': 'data:image/png;base64,${base64Encode(image)}'},
-        },
-    ];
+    final endpoint =
+        Uri.parse('$url/functions/v1/${AppConstants.fnAiExtract}');
     try {
-      final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {'Authorization': 'Bearer $apiKey', 'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'model': 'gpt-4o',
-          'messages': [
-            {'role': 'user', 'content': content}
-          ],
-          if (structured) 'response_format': {'type': 'json_object'},
-        }),
-      );
-      if (res.statusCode == 401) {
-        return const AiResult.failure('OpenAI rejected the API key. Check OPENAI_API_KEY in .env.');
-      }
+      final res = await http
+          .post(
+            endpoint,
+            headers: {
+              'Authorization': 'Bearer ${session.accessToken}',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'prompt': prompt,
+              'structured': structured,
+              if (image != null) 'image': base64Encode(image),
+              if (text != null && text.trim().isNotEmpty) 'text': text,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
       if (res.statusCode == 429) {
         return const AiResult.failure(
-            'OpenAI quota exceeded. Add credit/billing at platform.openai.com → Settings → Billing.');
+            'Free plan limit reached. Upgrade to Pro.', rateLimited: true);
       }
-      if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode}).');
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      final out = (body['choices']?[0]?['message']?['content'] as String?)?.trim() ?? '';
-      return AiResult.ok(out);
+      if (res.statusCode >= 400) {
+        return AiResult.failure('Scan failed (${res.statusCode})');
+      }
+      return AiResult.ok(
+          (jsonDecode(res.body)['result'] as String?) ?? '');
     } catch (e) {
-      return AiResult.failure('Scan error: $e');
+      return AiResult.failure('Extraction edge function unavailable: $e');
+    }
+  }
+
+  Future<AiResult> _extractViaClaude({
+    required String prompt,
+    required Uint8List image,
+    required String apiKey,
+  }) async {
+    try {
+      final base64Image = base64Encode(image);
+      final body = {
+        'model': 'claude-haiku-4-5',
+        'max_tokens': 2048,
+        'messages': [
+          {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': 'image/png',
+                  'data': base64Image,
+                },
+              },
+              {'type': 'text', 'text': prompt},
+            ],
+          }
+        ],
+      };
+
+      final res = await http
+          .post(
+            Uri.parse('https://api.anthropic.com/v1/messages'),
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 45));
+
+      if (res.statusCode >= 400) {
+        return AiResult.failure('Claude vision error (${res.statusCode})');
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final text = (data['content'] as List?)
+              ?.whereType<Map>()
+              .where((b) => b['type'] == 'text')
+              .map((b) => b['text'] as String)
+              .join('') ??
+          '';
+      return AiResult.ok(text.trim());
+    } catch (e) {
+      return AiResult.failure('Claude vision unavailable: $e');
     }
   }
 
@@ -455,14 +645,18 @@ class AiService {
         'location': 'Sydney, AU',
         'linkedin': 'in/alexdoe',
       },
-      'summary': 'Product designer with 6+ years crafting accessible, data-informed experiences.',
+      'summary':
+          'Product designer with 6+ years crafting accessible, data-informed experiences.',
       'experience': [
         {
           'title': 'Senior Product Designer',
           'company': 'Northwind',
           'startDate': '2021',
           'endDate': 'Present',
-          'bullets': ['Led the design system used across 4 squads', 'Raised activation 18% via onboarding redesign'],
+          'bullets': [
+            'Led the design system used across 4 squads',
+            'Raised activation 18% via onboarding redesign'
+          ],
         },
       ],
       'education': [
@@ -473,6 +667,8 @@ class AiService {
   }
 }
 
+// ── Result type ─────────────────────────────────────────────────────────────
+
 class AiResult {
   final String? text;
   final String? error;
@@ -480,7 +676,8 @@ class AiResult {
 
   const AiResult._(this.text, this.error, this.rateLimited);
   const AiResult.ok(String text) : this._(text, null, false);
-  const AiResult.failure(String error, {bool rateLimited = false}) : this._(null, error, rateLimited);
+  const AiResult.failure(String error, {bool rateLimited = false})
+      : this._(null, error, rateLimited);
 
   bool get isOk => error == null;
 }

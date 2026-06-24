@@ -16,8 +16,9 @@ supabase/
 │   ├── 0002_username.sql        # profiles.username + signup trigger
 │   └── 0003_materials.sql       # materials table + materials storage bucket
 └── functions/
-    ├── _shared/                 # cors, auth/rate-limit, openai prompt helpers
-    ├── ai-generate/             # Part G3 — summary, bullet, linkedin, skills, interview
+    ├── _shared/                 # cors, auth/rate-limit, AI prompt helpers
+    ├── ai-plan/                 # Claude planner/writer: summary, bullets, linkedin, interview
+    ├── ai-generate/             # Legacy OpenAI generator retained for manual fallback
     ├── ats-check/               # ATS score + keyword analysis
     ├── cover-letter/            # 3 formats (full / short email / recruiter)
     ├── ai-extract/              # GPT-4o vision: scan uploads → text/JSON (materials, import)
@@ -49,6 +50,7 @@ folder policies, the profile-on-signup trigger, and `delete_user()`.
 
 ```bash
 supabase functions deploy ai-generate
+supabase functions deploy ai-plan
 supabase functions deploy ats-check
 supabase functions deploy cover-letter
 supabase functions deploy ai-extract
@@ -67,11 +69,22 @@ set the rest:
 
 ```bash
 supabase secrets set \
+  CLAUDE_API_KEY=sk-ant-... \
+  CLAUDE_MODEL=claude-3-5-sonnet-20241022 \
   OPENAI_API_KEY=sk-... \
   STRIPE_SECRET_KEY=sk_test_... \
   STRIPE_WEBHOOK_SECRET=whsec_... \
   STRIPE_PRICE_ID=price_...
 ```
+
+## AI provider split
+
+- **Claude** (`ai-plan`, `cover-letter`) handles planning/writing: summaries,
+  bullet rewrites, LinkedIn text, interview prep, skills, and cover letters.
+- **OpenAI GPT-4o** (`ai-extract`, `ats-check`) handles vision/extraction and ATS
+  JSON analysis.
+- Provider keys must be Supabase secrets. Do **not** put `CLAUDE_API_KEY` or
+  `OPENAI_API_KEY` in the Flutter `.env` for production.
 
 ## Stripe configuration (Part H1)
 
@@ -116,7 +129,7 @@ STRIPE_PUBLISHABLE_KEY=pk_test_...   # publishable (public) key only
 ## Verify
 
 - DB: Supabase Studio → Table editor shows all tables with RLS enabled.
-- Functions: `supabase functions list` shows all five deployed.
+- Functions: `supabase functions list` shows all seven deployed.
 - AI: from the app (signed in), trigger an AI action — `ai_generation_logs` gets a row.
 - Stripe: use a test card on Checkout; `stripe-webhook` flips `subscriptions.status`
   to `trialing` and `payment_events` records the event.

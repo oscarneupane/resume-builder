@@ -3,7 +3,7 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { checkRateLimit, logUsage, requireUser } from '../_shared/auth.ts';
-import { chat } from '../_shared/openai.ts';
+import { chat } from '../_shared/claude.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

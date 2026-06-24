@@ -5,7 +5,7 @@ resumes, cover letters, LinkedIn copy, and interview answers — and let AI scan
 your uploaded files to reuse your real info everywhere.
 
 > The app runs in **mock mode** out of the box (no keys needed) so every screen
-> works for development. Add API keys to switch on real AI and the backend — see
+> works for development. Add Supabase secrets to switch on real AI and the backend — see
 > **[SETUP.md](SETUP.md)**.
 
 ## Quick start
@@ -16,9 +16,9 @@ cp .env.example .env      # then add your keys (optional for mock mode)
 flutter run
 ```
 
-To get real ChatGPT output fast, add your `OPENAI_API_KEY` to `.env` and rebuild
-— full steps in **[SETUP.md](SETUP.md)**. (`.env` is a bundled asset, so changes
-need a full rebuild, not a hot reload.)
+For real AI, deploy the Supabase backend and set provider keys as Edge Function
+secrets (`CLAUDE_API_KEY`, `OPENAI_API_KEY`). Do not ship provider keys inside
+the Flutter app. Full steps are in **[SETUP.md](SETUP.md)**.
 
 ## Features
 
@@ -36,8 +36,8 @@ need a full rebuild, not a hot reload.)
 ## Architecture
 
 - **Flutter** (Riverpod state, GoRouter navigation), feature-based folders under `lib/features/`.
-- **Services** (`lib/services/`) gate on configuration: real **Supabase** / **OpenAI** /
-  **Stripe** when keys are present, otherwise mock — so the app always runs.
+- **Services** (`lib/services/`) gate on configuration: real **Supabase** /
+  server-side **AI** / **Stripe** when configured, otherwise mock — so the app always runs.
 - **Supabase backend** (`supabase/`): 13 tables with RLS, storage buckets, and
   6 Edge Functions (AI generate/extract/ATS/cover-letter + Stripe checkout/webhook).
   Deploy steps in **[supabase/README.md](supabase/README.md)**.
@@ -46,7 +46,7 @@ need a full rebuild, not a hot reload.)
 
 | File | Purpose |
 |------|---------|
-| [`.env`](.env.example) | App-side keys (OpenAI dev key, Supabase URL/anon, Stripe publishable). Git-ignored. |
+| [`.env`](.env.example) | App-side public keys only (Supabase URL/anon, Stripe publishable, Google Places). Git-ignored. |
 | [`SETUP.md`](SETUP.md) | Step-by-step: how to insert API keys and go live. |
 | [`supabase/README.md`](supabase/README.md) | Deploy the DB schema + Edge Functions + secrets. |
 

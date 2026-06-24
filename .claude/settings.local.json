@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc --track-changes=all \"C:\\\\Users\\\\neupa\\\\Desktop\\\\resume_builder\\\\ApplyMate_Blueprint.docx\" -o \"C:\\\\Users\\\\neupa\\\\Desktop\\\\resume_builder\\\\blueprint.md\")",
+      "PowerShell(pandoc --track-changes=all \"C:\\\\Users\\\\neupa\\\\Desktop\\\\resume_builder\\\\ApplyMate_Blueprint.docx\" -o \"C:\\\\Users\\\\neupa\\\\Desktop\\\\resume_builder\\\\blueprint.md\")"
+    ]
+  }
+}

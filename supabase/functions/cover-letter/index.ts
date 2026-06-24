@@ -3,7 +3,7 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { checkRateLimit, logUsage, requireUser } from '../_shared/auth.ts';
-import { chat } from '../_shared/openai.ts';
+import { chat } from '../_shared/claude.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -23,7 +23,8 @@ Applicant skills: ${skills ?? ''}
 Job Description: ${jobDescription ?? ''}
 ${bg ? `Applicant background (use real details from this, do not invent):\n${bg}\n` : ''}Return a JSON object with keys: full_letter, short_email, recruiter_msg`;
 
-    const { content, tokens } = await chat(prompt, { json: true });
+    const { content, tokens, provider } = await chat(prompt, { json: true });
+    console.log(`[cover-letter] provider=${provider} tokens=${tokens}`);
     await logUsage(ctx, 'coverLetter', tokens);
 
     let parsed: Record<string, unknown> = {};

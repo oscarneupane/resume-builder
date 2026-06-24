@@ -5,10 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.applymate"
-    // file_picker / flutter_plugin_android_lifecycle require compileSdk 36+.
-    // SDK 36 is installed (see `flutter doctor`); pin it explicitly rather than
-    // relying on Flutter's default (34).
+    namespace = "com.applymate.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -17,11 +14,22 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        create("release") {
+            // Populated via key.properties (see DEPLOY_ANDROID.md).
+            // Falls back to debug signing if key.properties is absent.
+            val props = java.util.Properties()
+            val keyFile = rootProject.file("key.properties")
+            if (keyFile.exists()) props.load(keyFile.inputStream())
+            storeFile = if (props.getProperty("storeFile") != null) file(props.getProperty("storeFile")) else null
+            storePassword = props.getProperty("storePassword") ?: ""
+            keyAlias = props.getProperty("keyAlias") ?: ""
+            keyPassword = props.getProperty("keyPassword") ?: ""
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.applymate"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.applymate.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -30,19 +38,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
-        }
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-    }
-}
-
-flutter {
-    source = "../.."
-}
+            val props = java.util.Properties()
+            val keyFile = rootProject.file("key.properties")
+            signingConfig = if (keyFile.exists()) signingConfigs.getByName("releas
