@@ -1,43 +1,573 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ApplyMate — Smart Documents. Better Applications. More Confidence.</title>
-<style>
-  :root { --navy:#1B3A6B; --blue:#2E75B6; --ink:#1A1A1A; --grey:#6B7280; --bg:#fff; --card:#F5F8FF; --border:#E5E7EB; }
-  *{box-sizing:border-box} body{margin:0;font-family:Inter,Roboto,system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
-  .hero{background:linear-gradient(135deg,#1B3A6B,#15315c);color:#fff;padding:64px 24px;text-align:center}
-  .logo{width:72px;height:72px;border-radius:18px;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:16px}
-  h1{margin:.2em 0;font-size:2rem} .tag{color:#B7CDEB;font-size:1.05rem}
-  .wrap{max-width:760px;margin:0 auto;padding:40px 24px}
-  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}
-  .card h3{margin:.2em 0;color:var(--navy)} .card p{color:var(--grey);margin:.3em 0 0}
-  a{color:var(--blue)} footer{border-top:1px solid var(--border);margin-top:40px;padding:24px;text-align:center;color:var(--grey);font-size:.9rem}
-  @media(max-width:560px){.cards{grid-template-columns:1fr}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="ApplyMate is an AI-powered resume, cover letter, ATS, and interview preparation app for job seekers." />
+  <title>ApplyMate | AI Resume and Job Application Assistant</title>
+  <link rel="icon" href="assets/applymate-icon.png" />
+  <style>
+    :root {
+      --navy: #12345c;
+      --blue: #2f6fb3;
+      --cyan: #2ba6b6;
+      --green: #16a36f;
+      --amber: #e9a13b;
+      --coral: #d7654d;
+      --ink: #121826;
+      --muted: #637083;
+      --soft: #f4f7fb;
+      --line: #dce4ef;
+      --white: #ffffff;
+      --shadow: 0 22px 70px rgba(18, 52, 92, .17);
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--white);
+      line-height: 1.55;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+    button, input, textarea { font: inherit; }
+
+    .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255,255,255,.88);
+      border-bottom: 1px solid rgba(220, 228, 239, .85);
+      backdrop-filter: blur(16px);
+    }
+    .nav-inner {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: 0; }
+    .brand img { width: 38px; height: 38px; border-radius: 8px; box-shadow: 0 8px 20px rgba(18, 52, 92, .18); }
+    .nav-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-size: 14px; font-weight: 650; }
+    .nav-links a:hover { color: var(--navy); }
+    .nav-cta {
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--navy);
+      color: white;
+      box-shadow: 0 10px 24px rgba(18, 52, 92, .2);
+    }
+
+    .hero {
+      min-height: calc(100vh - 72px);
+      padding: 72px 0 52px;
+      background:
+        linear-gradient(135deg, rgba(18, 52, 92, .98), rgba(39, 96, 145, .94)),
+        radial-gradient(circle at 78% 22%, rgba(43, 166, 182, .24), transparent 35%);
+      color: white;
+      overflow: hidden;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(330px, .78fr);
+      gap: 54px;
+      align-items: center;
+    }
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      color: #c9f2ea;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--green); }
+    h1 {
+      margin: 0;
+      max-width: 700px;
+      font-size: clamp(42px, 7vw, 76px);
+      line-height: .98;
+      letter-spacing: 0;
+    }
+    .lead {
+      max-width: 650px;
+      margin: 24px 0 0;
+      color: #dcecff;
+      font-size: 20px;
+    }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-primary { background: #ffffff; color: var(--navy); }
+    .btn-secondary { border-color: rgba(255,255,255,.26); color: white; background: rgba(255,255,255,.08); }
+    .trust-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 42px;
+      max-width: 650px;
+    }
+    .trust {
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(255,255,255,.08);
+    }
+    .trust strong { display: block; font-size: 24px; line-height: 1.1; }
+    .trust span { color: #c9d8eb; font-size: 13px; }
+
+    .phone-frame {
+      width: min(380px, 100%);
+      margin-left: auto;
+      border-radius: 34px;
+      padding: 13px;
+      background: #0b1d34;
+      box-shadow: var(--shadow);
+      transform: rotate(1.5deg);
+    }
+    .phone-screen {
+      overflow: hidden;
+      border-radius: 25px;
+      background: #eef4fb;
+      min-height: 665px;
+      position: relative;
+    }
+    .phone-screen img {
+      width: 100%;
+      height: 665px;
+      object-fit: cover;
+      object-position: top center;
+    }
+    .score-chip {
+      position: absolute;
+      right: 18px;
+      top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.95);
+      color: var(--navy);
+      font-weight: 850;
+      box-shadow: 0 12px 26px rgba(18,52,92,.18);
+    }
+    .score-chip span {
+      width: 10px;
+      height: 10px;
+      border-radius: 99px;
+      background: var(--green);
+    }
+
+    section { padding: 82px 0; }
+    .section-head { max-width: 760px; margin-bottom: 32px; }
+    .eyebrow {
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+    h2 { margin: 0; font-size: clamp(30px, 4vw, 46px); line-height: 1.08; letter-spacing: 0; }
+    .section-copy { margin: 14px 0 0; color: var(--muted); font-size: 18px; }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: minmax(240px, .42fr) minmax(0, .58fr);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 18px 48px rgba(18, 52, 92, .08);
+    }
+    .tabs {
+      background: #f7f9fc;
+      border-right: 1px solid var(--line);
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .tab {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      padding: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 800;
+    }
+    .tab small { display: block; color: #7d899b; font-weight: 600; margin-top: 2px; }
+    .tab.active {
+      background: white;
+      color: var(--navy);
+      border-color: var(--line);
+      box-shadow: 0 10px 24px rgba(18, 52, 92, .08);
+    }
+    .panel { padding: 26px; min-height: 420px; background: white; }
+    .panel-layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(240px, .8fr); gap: 20px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; color: var(--ink); font-size: 13px; font-weight: 850; margin-bottom: 6px; }
+    .input, .textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfe;
+      color: var(--ink);
+    }
+    .textarea { min-height: 112px; resize: vertical; }
+    .output {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: linear-gradient(180deg, #f8fbff, #ffffff);
+    }
+    .output h3 { margin: 0 0 12px; color: var(--navy); font-size: 18px; }
+    .metric { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; font-size: 14px; }
+    .bar { flex: 1; height: 8px; border-radius: 99px; background: #e7edf5; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: inherit; background: var(--green); width: 88%; }
+    .output ul { margin: 12px 0 0; padding-left: 20px; color: var(--muted); }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .feature {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      background: white;
+    }
+    .icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 18px;
+      color: white;
+      font-weight: 900;
+    }
+    .i-blue { background: var(--blue); }
+    .i-green { background: var(--green); }
+    .i-amber { background: var(--amber); }
+    .i-coral { background: var(--coral); }
+    .feature h3 { margin: 0 0 8px; color: var(--navy); font-size: 18px; }
+    .feature p { margin: 0; color: var(--muted); font-size: 15px; }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+      gap: 24px;
+      align-items: stretch;
+    }
+    .band { background: var(--soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .info {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 22px;
+    }
+    .info h3 { margin: 0 0 10px; color: var(--navy); }
+    .info p { color: var(--muted); margin: 0; }
+    .stack { display: grid; gap: 12px; }
+    .stack-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #f8fbff;
+      border: 1px solid var(--line);
+      font-weight: 800;
+    }
+    .stack-row span { color: var(--muted); font-size: 13px; font-weight: 650; }
+
+    .final {
+      padding: 74px 0;
+      color: white;
+      background: linear-gradient(135deg, #12345c, #215c83);
+    }
+    .final-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+    }
+    .final h2 { max-width: 680px; }
+    .final p { margin: 12px 0 0; color: #dcecff; max-width: 640px; }
+
+    footer { padding: 34px 0; border-top: 1px solid var(--line); color: var(--muted); }
+    .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 18px; font-size: 14px; }
+    .footer-links { display: flex; gap: 18px; font-weight: 750; color: var(--navy); }
+
+    @media (max-width: 920px) {
+      .hero { min-height: auto; }
+      .hero-grid, .workflow, .panel-layout, .split { grid-template-columns: 1fr; }
+      .phone-frame { margin: 18px auto 0; transform: none; }
+      .tabs { border-right: 0; border-bottom: 1px solid var(--line); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .final-inner { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 28px, 1120px); }
+      .nav-inner { height: 64px; }
+      .nav-links a:not(.nav-cta) { display: none; }
+      .hero { padding-top: 48px; }
+      .lead { font-size: 17px; }
+      .trust-row, .features, .tabs { grid-template-columns: 1fr; }
+      .phone-screen, .phone-screen img { min-height: 560px; height: 560px; }
+      section { padding: 58px 0; }
+      .footer-inner { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
 </head>
 <body>
-  <div class="hero">
-    <div class="logo">⛰️</div>
-    <h1>ApplyMate</h1>
-    <div class="tag">Smart Documents. Better Applications. More Confidence.</div>
-  </div>
-  <div class="wrap">
-    <p>ApplyMate is an AI-powered job-application assistant for Android. It helps job seekers create polished,
-       ATS-friendly resumes, cover letters, LinkedIn copy, and interview answers — all powered by AI. ApplyMate is
-       not a job board and does not list vacancies.</p>
-    <div class="cards">
-      <div class="card"><h3>Resume Builder</h3><p>Build an ATS-friendly resume and export to PDF.</p></div>
-      <div class="card"><h3>Cover Letters</h3><p>Generate tailored cover letters from a job post.</p></div>
-      <div class="card"><h3>ATS Check</h3><p>Score your resume against a job description.</p></div>
-      <div class="card"><h3>Interview Prep</h3><p>Practice questions with AI feedback.</p></div>
+  <nav class="nav" aria-label="Primary navigation">
+    <div class="shell nav-inner">
+      <a class="brand" href="#top" aria-label="ApplyMate home">
+        <img src="assets/applymate-icon.png" alt="" />
+        <span>ApplyMate</span>
+      </a>
+      <div class="nav-links">
+        <a href="#demo">Demo</a>
+        <a href="#features">Features</a>
+        <a href="#trust">Trust</a>
+        <a class="nav-cta" href="https://github.com/oscarneupane/resume-builder">GitHub</a>
+      </div>
     </div>
-    <p style="margin-top:28px"><strong>Sign in with Google</strong> is used only to create your account and save
-       your documents. We request basic scopes only (email, profile, openid).</p>
-    <p><a href="privacy.html">Privacy Policy</a> &nbsp;·&nbsp; <a href="terms.html">Terms of Service</a></p>
-  </div>
-  <footer>© 2026 ApplyMate · Contact: support@applymate.app</footer>
-</body>
-</html>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="shell hero-grid">
+      <div>
+        <div class="kicker"><span class="dot"></span> AI job application workspace</div>
+        <h1>ApplyMate</h1>
+        <p class="lead">
+          A professional Android app for building resumes, cover letters, ATS checks, LinkedIn copy,
+          and interview answers from one clean workspace.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/oscarneupane/resume-builder/releases">Download APK</a>
+          <a class="btn btn-secondary" href="#features">Explore features</a>
+        </div>
+        <div class="trust-row" aria-label="Product highlights">
+          <div class="trust"><strong>88%</strong><span>resume potential signal</span></div>
+          <div class="trust"><strong>AI</strong><span>Claude · DeepSeek · Groq · Gemini</span></div>
+          <div class="trust"><strong>PDF</strong><span>ATS-friendly document export</span></div>
+        </div>
+      </div>
+
+      <div class="phone-frame" aria-label="ApplyMate app preview">
+        <div class="phone-screen">
+          <img src="assets/dashboard.png" alt="ApplyMate dashboard screenshot" />
+          <div class="score-chip"><span></span> 88% ready</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="demo">
+      <div class="shell">
+        <div class="section-head">
+          <div class="eyebrow">Working app flow</div>
+          <h2>From uploaded materials to job-ready documents.</h2>
+          <p class="section-copy">
+            ApplyMate keeps profile details, resumes, files, job posts, and AI outputs connected so the final result
+            feels tailored instead of generic.
+          </p>
+        </div>
+
+        <div class="workflow">
+          <div class="tabs" role="tablist" aria-label="ApplyMate workflow">
+            <button class="tab active" type="button" data-panel="resume">Resume score<small>Profile strength and ATS gaps</small></button>
+            <button class="tab" type="button" data-panel="cover">Cover letter<small>Tailored to a job post</small></button>
+            <button class="tab" type="button" data-panel="materials">AI materials<small>Uploads scanned into context</small></button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-layout" data-content="resume">
+              <form>
+                <div class="field">
+                  <label for="role">Target role</label>
+                  <input class="input" id="role" value="Junior Flutter Developer" />
+                </div>
+                <div class="field">
+                  <label for="summary">Resume evidence</label>
+                  <textarea class="textarea" id="summary">Flutter, Supabase, resume builder app, AI document generation, PDF export, Google sign in.</textarea>
+                </div>
+                <button class="btn" type="button" style="background:var(--navy);color:white">Analyze resume</button>
+              </form>
+              <div class="output">
+                <h3>Resume potential</h3>
+                <div class="metric"><strong>Overall readiness</strong><span>88%</span></div>
+                <div class="bar"><span></span></div>
+                <ul>
+                  <li>Add measurable outcomes for app performance and releases.</li>
+                  <li>Keep contact, phone, address, and target title complete.</li>
+                  <li>Match 6 to 9 job-description keywords naturally.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="panel-layout" data-content="cover" hidden>
+              <form>
+                <div class="field">
+                  <label for="company">Company</label>
+                  <input class="input" id="company" value="Hiring team" />
+                </div>
+                <div class="field">
+                  <label for="jobpost">Job post</label>
+                  <textarea class="textarea" id="jobpost">Looking for a mobile developer with Flutter, API integration, authentication, and polished product sense.</textarea>
+                </div>
+                <button class="btn" type="button" style="background:var(--blue);color:white">Generate letter</button>
+              </form>
+              <div class="output">
+                <h3>AI draft focus</h3>
+                <ul>
+                  <li>Opens with role fit and product motivation.</li>
+                  <li>Uses resume data, uploaded files, and job requirements.</li>
+                  <li>Ends with a concise, confident call to action.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="panel-layout" data-content="materials" hidden>
+              <form>
+                <div class="field">
+                  <label for="files">Uploaded context</label>
+                  <input class="input" id="files" value="resume.pdf, certificate.png, old_cover_letter.docx" />
+                </div>
+                <div class="field">
+                  <label for="notes">AI notes</label>
+                  <textarea class="textarea" id="notes">Scan uploaded resources, keep useful facts, and reuse them when creating final resumes and cover letters.</textarea>
+                </div>
+                <button class="btn" type="button" style="background:var(--green);color:white">Build context</button>
+              </form>
+              <div class="output">
+                <h3>Reusable profile memory</h3>
+                <ul>
+                  <li>Extracts skills, education, projects, certificates, and contact details.</li>
+                  <li>Stores private user materials through Supabase policies.</li>
+                  <li>Feeds the strongest evidence into document generation.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="features">
+      <div class="shell">
+        <div class="section-head">
+          <div class="eyebrow">Feature set</div>
+          <h2>Built around real job-seeker tasks.</h2>
+          <p class="section-copy">The app is more than a form. It is a guided system for turning experience into stronger applications.</p>
+        </div>
+        <div class="features">
+          <div class="feature"><div class="icon i-blue">R</div><h3>Resume builder</h3><p>Structured sections, required fields, phone and address helpers, and PDF export.</p></div>
+          <div class="feature"><div class="icon i-green">A</div><h3>ATS check</h3><p>Compares the resume against a job description and shows capability gaps.</p></div>
+          <div class="feature"><div class="icon i-amber">C</div><h3>Cover letters</h3><p>Creates tailored drafts from profile data, saved files, and the target job post.</p></div>
+          <div class="feature"><div class="icon i-coral">I</div><h3>Interview prep</h3><p>Turns a role into likely questions and gives feedback on practice answers.</p></div>
+          <div class="feature"><div class="icon i-blue">L</div><h3>LinkedIn optimizer</h3><p>Generates headline options, an About section, and a recruiter outreach message.</p></div>
+          <div class="feature"><div class="icon" style="background:var(--cyan);color:white">J</div><h3>Job tracker</h3><p>Save job postings and track application status from one place.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="trust">
+      <div class="shell split">
+        <div>
+          <div class="eyebrow">Architecture</div>
+          <h2>Designed for a production path.</h2>
+          <p class="section-copy">
+            Flutter handles the app experience. Supabase handles auth, data, storage, and server-side AI functions.
+            Provider keys stay on the backend, not inside the mobile app.
+          </p>
+        </div>
+        <div class="stack">
+          <div class="stack-row">Flutter app <span>Android now, stores later</span></div>
+          <div class="stack-row">Supabase <span>Auth, database, storage, RLS</span></div>
+          <div class="stack-row">Claude API <span>Planning and writing support</span></div>
+          <div class="stack-row">DeepSeek · Groq · Gemini <span>Free AI fallback providers</span></div>
+          <div class="stack-row">GitHub <span>Version control and Pages</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="shell split">
+        <div class="info">
+          <h3>Google sign in</h3>
+          <p>Google authentication is used to create an account, identify the user, and save documents. The app requests basic profile scopes only.</p>
+        </div>
+        <div class="info">
+          <h3>Data ownership</h3>
+          <p>Users keep ownership of their resumes, uploads, and generated documents. ApplyMate processes content only to provide requested features.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="shell final-inner">
+        <div>
+          <h2>A sharper public face for a stronger app.</h2>
+          <p>Use this page for reviewers, testers, Google OAuth verification, and the first production story while the mobile app continues to improve.</p>
+        </div>
+        <a class="btn btn-primary" href="https://github.com/oscarneupane/resume-builder">View repository</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-inner">
+      <div>Copyright 2026 ApplyMate. Owned and operated by Oscar Neupane.</div>
+      <div class="footer-links">
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const panels = document.querySelectorAll("[data-content]");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        panels.forEach((panel) => {
+          panel.hidden = panel.dataset.content !== tab.dataset.panel;
+        });
+      });
+    });
+  </script>
+</body></html>
