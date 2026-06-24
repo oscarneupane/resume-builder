@@ -93,6 +93,22 @@ class CoverLetterController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool scanning = false;
+
+  /// Pre-fills the job fields from an AI scan of a job posting (screenshot/PDF/text).
+  void applyJobScan(Map<String, dynamic> data) {
+    String s(Object? v) => (v ?? '').toString().trim();
+    if (s(data['jobTitle']).isNotEmpty) jobTitle = s(data['jobTitle']);
+    if (s(data['companyName']).isNotEmpty) companyName = s(data['companyName']);
+    if (s(data['jobDescription']).isNotEmpty) jobDescription = s(data['jobDescription']);
+    final ks = ((data['keySkills'] as List?) ?? const [])
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (ks.isNotEmpty) skills = ks.join(', ');
+    notifyListeners();
+  }
+
   Future<void> generate() async {
     if (!canGenerate || loading) return;
     loading = true;

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../core/constants.dart';
 import '../features/auth/auth_provider.dart';
 import '../features/auth/screens/forgot_password_screen.dart';
 import '../features/auth/screens/login_screen.dart';
@@ -23,9 +21,6 @@ import '../features/resume_builder/screens/resume_builder_screen.dart';
 import '../features/resume_builder/screens/resume_list_screen.dart';
 import '../features/resume_builder/screens/resume_preview_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
-import '../features/subscription/screens/payment_failed_screen.dart';
-import '../features/subscription/screens/payment_success_screen.dart';
-import '../features/subscription/screens/subscription_screen.dart';
 
 class AppRoutes {
   static const splash = '/';
@@ -52,15 +47,13 @@ class AppRoutes {
   static const settings = '/settings';
   static const privacy = '/privacy';
   static const terms = '/terms';
-  static const subscription = '/subscription';
-  static const paymentSuccess = '/payment-success';
-  static const paymentFailed = '/payment-failed';
 }
 
-final _onboardingFlagProvider = FutureProvider<bool>((ref) async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool(AppConstants.prefHasOnboarded) ?? false;
-});
+/// Whether onboarding is complete. Seeded synchronously from SharedPreferences
+/// at app start (see main.dart's ProviderScope override) and flipped to `true`
+/// when onboarding finishes — so the router redirect updates immediately
+/// instead of being stuck on a one-time async read.
+final onboardingFlagProvider = StateProvider<bool>((ref) => false);
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -75,8 +68,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return loc == AppRoutes.splash ? null : AppRoutes.splash;
       }
 
-      final onboardedAsync = ref.read(_onboardingFlagProvider);
-      final hasOnboarded = onboardedAsync.maybeWhen(data: (v) => v, orElse: () => false);
+      final hasOnboarded = ref.read(onboardingFlagProvider);
 
       final atSplash = loc == AppRoutes.splash;
       final atAuth = const {AppRoutes.login, AppRoutes.signup, AppRoutes.forgot}.contains(loc);
@@ -124,9 +116,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: AppRoutes.settings, builder: (_, __) => const SettingsScreen()),
       GoRoute(path: AppRoutes.privacy, builder: (_, __) => const LegalScreen(doc: LegalDoc.privacy)),
       GoRoute(path: AppRoutes.terms, builder: (_, __) => const LegalScreen(doc: LegalDoc.terms)),
-      GoRoute(path: AppRoutes.subscription, builder: (_, __) => const SubscriptionScreen()),
-      GoRoute(path: AppRoutes.paymentSuccess, builder: (_, __) => const PaymentSuccessScreen()),
-      GoRoute(path: AppRoutes.paymentFailed, builder: (_, __) => const PaymentFailedScreen()),
     ],
   );
 });
@@ -135,7 +124,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 class _RouterRefreshNotifier extends ChangeNotifier {
   _RouterRefreshNotifier(Ref ref) {
     _sub = ref.listen<AuthState>(authStateProvider, (_, __) => notifyListeners(), fireImmediately: false);
-    ref.listen(_onboardingFlagProvider, (_, __) => notifyListeners(), fireImmediately: false);
+    ref.listen(onboardingFlagProvider, (_, __) => notifyListeners(), fireImmediately: false);
   }
   late final ProviderSubscription _sub;
 

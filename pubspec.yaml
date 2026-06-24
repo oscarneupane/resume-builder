@@ -56,8 +56,24 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+# App launcher icon (run: dart run flutter_launcher_icons)
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#1B3A6B"
+  adaptive_icon_foreground: "assets/icon/icon_fg.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
   assets:
     - .env
+  fonts:
+    # Inter is the official typeface (blueprint I1). Variable font — Flutter
+    # maps FontWeight to the wght axis automatically.
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../app/theme.dart';
-import '../../../core/constants.dart';
 import '../../../core/extensions.dart';
 import '../../../models/document_model.dart';
 import '../../../services/documents_repository.dart';
@@ -12,7 +11,6 @@ import '../../../services/pdf_service.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../dashboard/widgets/ats_score_gauge.dart';
 import '../controllers/resume_builder_controller.dart';
-import 'resume_builder_screen.dart' show TemplateOption;
 
 class ResumePreviewScreen extends ConsumerStatefulWidget {
   const ResumePreviewScreen({super.key});
@@ -42,59 +40,13 @@ class _ResumePreviewScreenState extends ConsumerState<ResumePreviewScreen> {
     }
   }
 
-  void _openTemplateDrawer(ResumeBuilderController c) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Choose a template', style: context.text.titleLarge),
-            const SizedBox(height: 16),
-            for (final t in AppConstants.availableTemplates)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TemplateOption(
-                  name: t,
-                  selected: c.template == t,
-                  onTap: () {
-                    c.setTemplate(t);
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = ref.watch(resumeBuilderControllerProvider);
-    final accent = switch (c.template) {
-      'modern' => AppColors.accent,
-      'minimal' => AppColors.textPrimary,
-      _ => AppColors.primary,
-    };
+    const accent = AppColors.textPrimary;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Preview'),
-        actions: [
-          IconButton(
-            tooltip: 'Change template',
-            icon: const Icon(Icons.style_outlined),
-            onPressed: () => _openTemplateDrawer(c),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Preview')),
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -148,24 +100,65 @@ class _ResumeCanvas extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = c.fullName.trim().isEmpty ? 'Your Name' : c.fullName.trim();
     final contact = [
-      if (c.email.trim().isNotEmpty) c.email.trim(),
-      if (c.phone.trim().isNotEmpty) c.phone.trim(),
       if (c.location.trim().isNotEmpty) c.location.trim(),
-      if (c.linkedin.trim().isNotEmpty) c.linkedin.trim(),
-    ].join('  •  ');
+      if (c.phone.trim().isNotEmpty) c.phone.trim(),
+      if (c.email.trim().isNotEmpty) c.email.trim(),
+    ].join('  |  ');
+    final links = [
+      if (c.linkedin.trim().isNotEmpty) 'LinkedIn: ${c.linkedin.trim()}',
+      if (c.github.trim().isNotEmpty) 'GitHub: ${c.github.trim()}',
+      if (c.portfolio.trim().isNotEmpty) 'Portfolio: ${c.portfolio.trim()}',
+    ].join('  |  ');
+
+    final projects = c.projects.where((p) => p.name.trim().isNotEmpty || p.description.trim().isNotEmpty).toList();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(name, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: accent)),
-        if (c.title.trim().isNotEmpty)
-          Text(c.title.trim(), style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        Text(name.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: accent, letterSpacing: 1)),
         if (contact.isNotEmpty) ...[
           const SizedBox(height: 4),
-          Text(contact, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          Text(contact, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         ],
-        const SizedBox(height: 12),
-        if (c.summary.trim().isNotEmpty) _section('Summary', Text(c.summary.trim())),
+        if (links.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(links, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        ],
+        const SizedBox(height: 8),
+        if (c.summary.trim().isNotEmpty)
+          _section('Professional Summary', Text(c.summary.trim(), style: const TextStyle(fontSize: 13, height: 1.4))),
+        if (c.skills.isNotEmpty) _section('Technical Skills', _skills()),
+        if (projects.isNotEmpty)
+          _section(
+            'Projects',
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final p in projects)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                            children: [
+                              TextSpan(text: p.name.trim(), style: const TextStyle(fontWeight: FontWeight.w700)),
+                              if (p.description.trim().isNotEmpty) TextSpan(text: ' — ${p.description.trim()}'),
+                            ],
+                          ),
+                        ),
+                        if (p.link.trim().isNotEmpty)
+                          Text(p.link.trim(), style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
         if (c.experiences.any((e) => e.title.trim().isNotEmpty || e.company.trim().isNotEmpty))
           _section(
             'Experience',
@@ -178,8 +171,9 @@ class _ResumeCanvas extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${e.title} • ${e.company}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${e.startDate} — ${e.current ? 'Present' : e.endDate}',
+                        Text([e.title, e.company].where((s) => s.trim().isNotEmpty).join(' — '),
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text('${e.startDate} – ${e.current ? 'Present' : e.endDate}',
                             style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                         for (final b in e.bullets.where((b) => b.trim().isNotEmpty))
                           Padding(
@@ -204,8 +198,9 @@ class _ResumeCanvas extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(e.degree, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${e.school} • ${e.endDate}',
+                        if (e.degree.trim().isNotEmpty)
+                          Text(e.degree, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text([e.school, e.endDate].where((s) => s.trim().isNotEmpty).join('  •  '),
                             style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                       ],
                     ),
@@ -213,25 +208,33 @@ class _ResumeCanvas extends StatelessWidget {
               ],
             ),
           ),
-        if (c.skills.isNotEmpty)
-          _section(
-            'Skills',
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: c.skills
-                  .map((s) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardSurface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(s, style: const TextStyle(fontSize: 12)),
-                      ))
-                  .toList(),
+      ],
+    );
+  }
+
+  Widget _skills() {
+    final grouped = c.skills.where((s) => s.contains(':')).toList();
+    final plain = c.skills.where((s) => !s.contains(':')).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final g in grouped)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary),
+                children: [
+                  TextSpan(
+                    text: '${g.substring(0, g.indexOf(':')).trim()}: ',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: g.substring(g.indexOf(':') + 1).trim()),
+                ],
+              ),
             ),
           ),
+        if (plain.isNotEmpty) Text(plain.join(', '), style: const TextStyle(fontSize: 12.5)),
       ],
     );
   }
@@ -239,10 +242,10 @@ class _ResumeCanvas extends StatelessWidget {
   Widget _section(String title, Widget child) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(title.toUpperCase(),
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: accent)),
-          Container(margin: const EdgeInsets.symmetric(vertical: 4), height: 1, color: accent.withValues(alpha: 0.4)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: accent, letterSpacing: 0.5)),
+          Container(margin: const EdgeInsets.only(top: 2, bottom: 6), height: 1, color: accent),
           child,
         ],
       );

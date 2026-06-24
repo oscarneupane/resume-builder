@@ -79,9 +79,9 @@ class _AtsCheckerScreenState extends ConsumerState<AtsCheckerScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.06),
+                color: AppColors.error.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
               ),
               child: Text(_error!, style: const TextStyle(color: AppColors.error)),
             ),
@@ -129,9 +129,9 @@ class _KeywordSection extends StatelessWidget {
               .map((k) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.08),
+                      color: color.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: color.withOpacity(0.4)),
+                      border: Border.all(color: color.withValues(alpha: 0.4)),
                     ),
                     child: Text(k, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
                   ))
