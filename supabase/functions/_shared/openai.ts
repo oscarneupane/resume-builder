@@ -1,17 +1,64 @@
-// OpenAI chat helper + prompt templates (blueprint Part G4).
+// AI chat helper + prompt templates (blueprint Part G4).
+//
+// Provider-agnostic: picks the provider by which secret is set, preferring FREE
+// providers so a free key takes over a quota-blocked OpenAI key. All three speak
+// the OpenAI chat-completions format, so callers don't change.
+//   GEMINI_API_KEY     → Gemini (free tier) — model gemini-flash-latest
+//   OPENROUTER_API_KEY → OpenRouter (free models)
+//   OPENAI_API_KEY     → OpenAI (paid)
+export interface AiProvider {
+  name: string;
+  baseUrl: string;
+  key: string;
+  model: string;
+  visionModel: string;
+}
+
+export function aiProvider(): AiProvider {
+  const gemini = Deno.env.get('GEMINI_API_KEY');
+  if (gemini) {
+    return {
+      name: 'Gemini',
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      key: gemini,
+      model: 'gemini-flash-latest',
+      visionModel: 'gemini-flash-latest',
+    };
+  }
+  const openrouter = Deno.env.get('OPENROUTER_API_KEY');
+  if (openrouter) {
+    return {
+      name: 'OpenRouter',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      key: openrouter,
+      model: 'google/gemini-2.0-flash-exp:free',
+      visionModel: 'google/gemini-2.0-flash-exp:free',
+    };
+  }
+  return {
+    name: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    key: Deno.env.get('OPENAI_API_KEY') ?? '',
+    model: 'gpt-4o',
+    visionModel: 'gpt-4o',
+  };
+}
 
 export async function chat(prompt: string, opts: { json?: boolean } = {}): Promise<{
   content: string;
   tokens: number;
 }> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const p = aiProvider();
+  const res = await fetch(`${p.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+      'Authorization': `Bearer ${p.key}`,
       'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://applymate.app',
+      'X-Title': 'ApplyMate',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: p.model,
       messages: [{ role: 'user', content: prompt }],
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
     }),
@@ -19,7 +66,7 @@ export async function chat(prompt: string, opts: { json?: boolean } = {}): Promi
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${text}`);
+    throw new Error(`${p.name} error ${res.status}: ${text}`);
   }
 
   const data = await res.json();
@@ -113,6 +160,38 @@ Result: ...`,
         json: true,
         prompt: `Suggest 10 relevant resume skills for the job title: ${s(ctx, 'jobTitle')}.
 Return a JSON object with a single key "skills" whose value is an array of strings.`,
+      };
+
+    case 'interviewFeedback':
+      return {
+        json: true,
+        prompt: `You are an experienced interview coach. Score and critique the candidate's answer.
+Question: ${s(ctx, 'question')}
+Job title: ${s(ctx, 'jobTitle')}
+Candidate's answer: ${s(ctx, 'answer')}
+Return a JSON object with EXACTLY these keys: "score" (number 0-100),
+"summary" (string), "strengths" (array of short strings),
+"improvements" (array of short, specific, actionable strings).`,
+      };
+
+    case 'fullResume':
+      return {
+        json: true,
+        prompt: `You are an expert resume writer. Using ONLY the candidate details below,
+produce a complete, polished, ATS-friendly resume. Improve wording, write strong
+action-verb bullet points with quantified impact where plausible, group technical
+skills by category, and write concise one-line project descriptions. Do NOT invent
+employers, schools, job titles, dates, or contact details that are not present.
+Target role: ${s(ctx, 'jobTitle')}
+${s(ctx, 'notes') ? `Extra notes: ${s(ctx, 'notes')}\n` : ''}Candidate details:
+${s(ctx, 'details')}
+Return a JSON object with EXACTLY these keys: "personal"
+{"fullName","title","email","phone","location","linkedin","github","portfolio"},
+"summary" (string), "skills" (array of strings, each "Category: a, b, c"),
+"projects" (array of {"name","description","link"}),
+"experience" (array of {"title","company","startDate","endDate","bullets":[string]}),
+"education" (array of {"degree","school","startDate","endDate"}).
+Use empty strings/arrays where unknown.`,
       };
 
     default:

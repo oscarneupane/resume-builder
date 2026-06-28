@@ -27,10 +27,12 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
   int _step = 0;
   bool _summaryLoading = false;
   bool _skillsLoading = false;
+  bool _generatingAll = false;
   bool _saving = false;
+  String? _improvingBulletKey;
   final _personalFormKey = GlobalKey<FormState>();
 
-  static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Skills', 'Extras', 'Template'];
+  static const _stepNames = ['Personal', 'Summary', 'Experience', 'Education', 'Projects', 'Skills', 'Extras', 'Generate'];
 
   Future<void> _saveDraft(ResumeBuilderController c) async {
     if (!SupabaseService.isConfigured) {
@@ -72,6 +74,46 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
     }
   }
 
+  /// Final step action: AI turns everything entered into a complete resume in
+  /// the app's single ATS layout, then opens the preview. Enriches wording —
+  /// does not invent employers/schools/dates (enforced in the prompt).
+  Future<void> _generateFullResume(ResumeBuilderController c) async {
+    final role = c.aiTargetRole.trim().isNotEmpty ? c.aiTargetRole.trim() : c.title.trim();
+
+    setState(() => _generatingAll = true);
+    final res = await AiService.instance.generate(
+      feature: AiFeature.fullResume,
+      context: {
+        'jobTitle': role,
+        'notes': c.aiNotes.trim(),
+        'details': c.aiDetails(),
+      },
+    );
+    if (!mounted) return;
+    setState(() => _generatingAll = false);
+
+    if (!res.isOk || res.text == null) {
+      context.showSnack(res.error ?? 'Could not generate the resume.');
+      return;
+    }
+    try {
+      final data = jsonDecode(res.text!) as Map<String, dynamic>;
+      // Fresh AI pass owns skills/projects — clear so grouped output isn't merged.
+      c.update(() {
+        c.skills.clear();
+        c.projects
+          ..clear()
+          ..add(ProjectEntry());
+      });
+      c.applyExtracted(data);
+      if (!mounted) return;
+      context.showSnack('Resume generated — review and export.');
+      context.push(AppRoutes.resumePreview);
+    } catch (_) {
+      context.showSnack('The AI returned an unexpected format. Please try again.');
+    }
+  }
+
   void _onNext() {
     // Step 0 (Personal) gates on required fields.
     if (_step == 0) {
@@ -81,10 +123,25 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
         return;
       }
     }
-    if (_step == _stepNames.length - 1) {
-      context.push(AppRoutes.resumePreview);
+    setState(() => _step++);
+  }
+
+  /// AI-rewrites a single experience bullet into a stronger, quantified version.
+  Future<void> _improveBullet(ResumeBuilderController c, ExperienceEntry e, int b) async {
+    final original = e.bullets[b].trim();
+    if (original.isEmpty) return;
+    final i = c.experiences.indexOf(e);
+    setState(() => _improvingBulletKey = 'exp-$i-bullet-$b');
+    final res = await AiService.instance.generate(
+      feature: AiFeature.bulletImprover,
+      context: {'bullet': original, 'jobTitle': c.title},
+    );
+    if (!mounted) return;
+    setState(() => _improvingBulletKey = null);
+    if (res.isOk && res.text != null && res.text!.trim().isNotEmpty) {
+      c.update(() => e.bullets[b] = res.text!.trim());
     } else {
-      setState(() => _step++);
+      context.showSnack(res.error ?? 'Could not improve the bullet.');
     }
   }
 
@@ -171,10 +228,17 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
                     ),
                   if (_step > 0) const SizedBox(width: 12),
                   Expanded(
-                    child: AppButton(
-                      label: _step == _stepNames.length - 1 ? 'Preview Resume' : 'Next',
-                      onPressed: () => _onNext(),
-                    ),
+                    child: _step == _stepNames.length - 1
+                        ? AppButton(
+                            label: _generatingAll ? 'Generating…' : 'Generate',
+                            icon: Icons.auto_awesome,
+                            loading: _generatingAll,
+                            onPressed: () => _generateFullResume(c),
+                          )
+                        : AppButton(
+                            label: 'Next',
+                            onPressed: () => _onNext(),
+                          ),
                   ),
                 ],
               ),
@@ -192,78 +256,22 @@ class _ResumeBuilderScreenState extends ConsumerState<ResumeBuilderScreen> {
       case 1:
         return SummaryStep(c, onAiGenerate: () => _generateSummary(c), aiLoading: _summaryLoading);
       case 2:
-        return ExperienceStep(c);
+        return ExperienceStep(
+          c,
+          onImproveBullet: (e, b) => _improveBullet(c, e, b),
+          improvingBulletKey: _improvingBulletKey,
+        );
       case 3:
         return EducationStep(c);
       case 4:
-        return SkillsStep(c, onAiSuggest: () => _suggestSkills(c), aiLoading: _skillsLoading);
+        return ProjectsStep(c);
       case 5:
-        return ExtrasStep(c);
+        return SkillsStep(c, onAiSuggest: () => _suggestSkills(c), aiLoading: _skillsLoading);
       case 6:
-        return _TemplateStep(c);
+        return ExtrasStep(c);
+      case 7:
+        return GenerateStep(c);
     }
     return const SizedBox.shrink();
-  }
-}
-
-/// Step 6 — template chooser (also available from the preview screen).
-class _TemplateStep extends StatelessWidget {
-  final ResumeBuilderController c;
-  const _TemplateStep(this.c);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Pick a template', style: context.text.titleLarge),
-        const SizedBox(height: 4),
-        Text('You can change this anytime from the preview.',
-            style: context.text.bodySmall),
-        const SizedBox(height: 16),
-        for (final t in AppConstants.availableTemplates)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: TemplateOption(
-              name: t,
-              selected: c.template == t,
-              onTap: () => c.setTemplate(t),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Reusable template option card (used in builder step and preview drawer).
-class TemplateOption extends StatelessWidget {
-  final String name;
-  final bool selected;
-  final VoidCallback onTap;
-  const TemplateOption({super.key, required this.name, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.cardSurface,
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.description_outlined, color: AppColors.primary),
-            const SizedBox(width: 12),
-            Text(name.capitalized, style: context.text.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
-            const Spacer(),
-            if (selected) const Icon(Icons.check_circle, color: AppColors.primary),
-          ],
-        ),
-      ),
-    );
   }
 }

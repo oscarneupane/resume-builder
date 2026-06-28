@@ -6,12 +6,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants.dart';
 import '../../../services/ai_service.dart';
 
-/// One generated question + its lazily-generated STAR answer.
+/// One generated question + its lazily-generated STAR answer, plus optional
+/// AI feedback on the user's own attempt.
 class InterviewQuestion {
   final String question;
   String? answer;
   bool answerLoading;
-  InterviewQuestion(this.question, {this.answer, this.answerLoading = false});
+
+  /// The user's own attempt at answering (for AI feedback).
+  String userAnswer;
+
+  /// Parsed feedback: {score, summary, strengths[], improvements[]}.
+  Map<String, dynamic>? feedback;
+  bool feedbackLoading;
+
+  InterviewQuestion(
+    this.question, {
+    this.answer,
+    this.answerLoading = false,
+    this.userAnswer = '',
+    this.feedback,
+    this.feedbackLoading = false,
+  });
 }
 
 class InterviewController extends ChangeNotifier {
@@ -72,6 +88,31 @@ class InterviewController extends ChangeNotifier {
       q.answer = res.text!.trim();
     } else {
       error = res.error ?? 'Could not generate answer.';
+    }
+    notifyListeners();
+  }
+
+  /// Scores the user's own answer and returns actionable feedback.
+  Future<void> getFeedback(InterviewQuestion q) async {
+    if (q.feedbackLoading || q.userAnswer.trim().isEmpty) return;
+    q.feedbackLoading = true;
+    q.feedback = null;
+    notifyListeners();
+
+    final res = await AiService.instance.generate(
+      feature: AiFeature.interviewFeedback,
+      context: {'question': q.question, 'jobTitle': jobTitle.trim(), 'answer': q.userAnswer.trim()},
+    );
+
+    q.feedbackLoading = false;
+    if (res.isOk && res.text != null) {
+      try {
+        q.feedback = jsonDecode(res.text!) as Map<String, dynamic>;
+      } catch (_) {
+        error = 'Could not read the feedback.';
+      }
+    } else {
+      error = res.error ?? 'Could not get feedback.';
     }
     notifyListeners();
   }

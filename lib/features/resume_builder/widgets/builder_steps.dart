@@ -7,6 +7,7 @@ import '../../../shared/widgets/address_autocomplete_field.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../controllers/resume_builder_controller.dart';
+import 'address_field.dart';
 
 // NOTE on state: text fields write to the model directly in onChanged WITHOUT
 // calling notifyListeners. That avoids rebuilding the step on every keystroke
@@ -61,8 +62,75 @@ class PersonalStep extends StatelessWidget {
             onChanged: (v) => c.location = v,
             validator: (v) => Validators.required(v, 'Location'),
           ),
+          AddressField(c),
           const SizedBox(height: 12),
           AppTextField(label: 'LinkedIn URL', initialValue: c.linkedin, onChanged: (v) => c.linkedin = v),
+          const SizedBox(height: 12),
+          AppTextField(label: 'GitHub URL', initialValue: c.github, onChanged: (v) => c.github = v),
+          const SizedBox(height: 12),
+          AppTextField(label: 'Portfolio URL', initialValue: c.portfolio, onChanged: (v) => c.portfolio = v),
+        ],
+      ),
+    );
+  }
+}
+
+/// Step 4 — Projects (repeating). Optional; the AI generator fills these too.
+class ProjectsStep extends StatelessWidget {
+  final ResumeBuilderController c;
+  const ProjectsStep(this.c, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < c.projects.length; i++) _entry(context, i),
+        const SizedBox(height: 8),
+        AppButton(
+          label: 'Add Project',
+          icon: Icons.add,
+          variant: AppButtonVariant.secondary,
+          onPressed: c.addProject,
+        ),
+      ],
+    );
+  }
+
+  Widget _entry(BuildContext context, int i) {
+    final p = c.projects[i];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text('Project ${i + 1}', style: context.text.titleLarge),
+              const Spacer(),
+              if (c.projects.length > 1)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                  onPressed: () => c.removeProject(i),
+                ),
+            ],
+          ),
+          AppTextField(label: 'Project name', initialValue: p.name, onChanged: (v) => p.name = v),
+          const SizedBox(height: 10),
+          AppTextField(
+            label: 'Description',
+            hint: 'What it does / what you built',
+            initialValue: p.description,
+            onChanged: (v) => p.description = v,
+          ),
+          const SizedBox(height: 10),
+          AppTextField(label: 'Link (optional)', initialValue: p.link, onChanged: (v) => p.link = v),
         ],
       ),
     );
@@ -106,7 +174,14 @@ class SummaryStep extends StatelessWidget {
 /// Step 2 — Work experience (repeating).
 class ExperienceStep extends StatelessWidget {
   final ResumeBuilderController c;
-  const ExperienceStep(this.c, {super.key});
+
+  /// Called to AI-improve a single bullet (experience entry + bullet index).
+  final void Function(ExperienceEntry e, int bulletIndex)? onImproveBullet;
+
+  /// Key of the bullet currently being improved (so its button shows a spinner).
+  final String? improvingBulletKey;
+
+  const ExperienceStep(this.c, {super.key, this.onImproveBullet, this.improvingBulletKey});
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +249,7 @@ class ExperienceStep extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             title: const Text('I currently work here'),
             value: e.current,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             onChanged: (v) => c.update(() => e.current = v),
           ),
           const Divider(),
@@ -187,6 +262,8 @@ class ExperienceStep extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextFormField(
+                      // Re-seed when AI rewrites the bullet (content hash changes).
+                      key: ValueKey('exp-$i-bullet-$b-${e.bullets[b].hashCode}'),
                       initialValue: e.bullets[b],
                       maxLines: 2,
                       minLines: 1,
@@ -194,6 +271,17 @@ class ExperienceStep extends StatelessWidget {
                       onChanged: (v) => e.bullets[b] = v,
                     ),
                   ),
+                  if (onImproveBullet != null)
+                    (improvingBulletKey == 'exp-$i-bullet-$b')
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : IconButton(
+                            tooltip: 'AI improve',
+                            icon: const Icon(Icons.auto_awesome, size: 20, color: AppColors.primary),
+                            onPressed: e.bullets[b].trim().isEmpty ? null : () => onImproveBullet!(e, b),
+                          ),
                   IconButton(
                     icon: const Icon(Icons.remove_circle_outline, size: 20),
                     onPressed: e.bullets.length > 1 ? () => c.update(() => e.bullets.removeAt(b)) : null,
@@ -354,6 +442,69 @@ class _SkillsStepState extends State<SkillsStep> {
           variant: AppButtonVariant.secondary,
           loading: widget.aiLoading,
           onPressed: widget.onAiSuggest,
+        ),
+      ],
+    );
+  }
+}
+
+/// Final step — turn everything entered into a finished resume. Collects the
+/// target role (defaults to the entered title) and optional notes; the bottom
+/// "Generate with AI" button runs the generation.
+class GenerateStep extends StatelessWidget {
+  final ResumeBuilderController c;
+  const GenerateStep(this.c, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        const Center(child: Icon(Icons.auto_awesome, size: 48, color: AppColors.primary)),
+        const SizedBox(height: 12),
+        Text('Generate your resume', textAlign: TextAlign.center, style: context.text.titleLarge),
+        const SizedBox(height: 6),
+        Text(
+          'AI turns everything you entered into a polished, ATS-ready resume — '
+          'sharper wording, grouped skills, and strong bullet points. It uses '
+          'your real details only and won’t invent jobs or dates.',
+          textAlign: TextAlign.center,
+          style: context.text.bodySmall,
+        ),
+        const SizedBox(height: 20),
+        AppTextField(
+          label: 'Target role',
+          hint: 'e.g. IT Support Officer',
+          initialValue: c.aiTargetRole.isNotEmpty ? c.aiTargetRole : c.title,
+          onChanged: (v) => c.aiTargetRole = v,
+        ),
+        const SizedBox(height: 12),
+        AppTextField(
+          label: 'Anything else? (optional)',
+          hint: 'Tone, focus areas, target company…',
+          maxLines: 4,
+          initialValue: c.aiNotes,
+          onChanged: (v) => c.aiNotes = v,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.lightbulb_outline, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Tap “Generate with AI” below to create your resume.',
+                    style: context.text.bodySmall),
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -59,6 +59,21 @@ class EducationEntry {
       };
 }
 
+/// One project entry being edited in the builder.
+class ProjectEntry {
+  String name;
+  String description;
+  String link;
+
+  ProjectEntry({this.name = '', this.description = '', this.link = ''});
+
+  Map<String, dynamic> toContent() => {
+        'name': name,
+        'description': description,
+        if (link.trim().isNotEmpty) 'link': link,
+      };
+}
+
 /// Mutable draft held while the user fills the multi-step builder. Kept in
 /// memory for now; once Supabase is wired, [toResume] maps cleanly to the
 /// `resume_sections` JSONB rows.
@@ -70,6 +85,8 @@ class ResumeBuilderController extends ChangeNotifier {
   String phone = '';
   String location = '';
   String linkedin = '';
+  String github = '';
+  String portfolio = '';
 
   // Summary
   String summary = '';
@@ -77,6 +94,7 @@ class ResumeBuilderController extends ChangeNotifier {
   // Repeating sections
   final List<ExperienceEntry> experiences = [ExperienceEntry()];
   final List<EducationEntry> education = [EducationEntry()];
+  final List<ProjectEntry> projects = [ProjectEntry()];
   final List<String> skills = [];
 
   // Extras
@@ -84,6 +102,10 @@ class ResumeBuilderController extends ChangeNotifier {
   final List<String> languages = [];
 
   String template = AppConstants.defaultTemplate;
+
+  // Inputs for the final "Generate with AI" step (transient — not persisted).
+  String aiTargetRole = '';
+  String aiNotes = '';
 
   /// Set once the draft has been persisted to Supabase, so subsequent saves
   /// update the same row instead of creating duplicates.
@@ -103,6 +125,8 @@ class ResumeBuilderController extends ChangeNotifier {
     if (s(p['phone']).isNotEmpty) phone = s(p['phone']);
     if (s(p['location']).isNotEmpty) location = s(p['location']);
     if (s(p['linkedin']).isNotEmpty) linkedin = s(p['linkedin']);
+    if (s(p['github']).isNotEmpty) github = s(p['github']);
+    if (s(p['portfolio']).isNotEmpty) portfolio = s(p['portfolio']);
     if (s(data['summary']).isNotEmpty) summary = s(data['summary']);
 
     final exp = (data['experience'] as List?) ?? const [];
@@ -135,6 +159,20 @@ class ResumeBuilderController extends ChangeNotifier {
             school: s(m['school']),
             startDate: s(m['startDate']),
             endDate: s(m['endDate']),
+          );
+        }));
+    }
+
+    final proj = (data['projects'] as List?) ?? const [];
+    if (proj.isNotEmpty) {
+      projects
+        ..clear()
+        ..addAll(proj.map((e) {
+          final m = Map<String, dynamic>.from(e as Map);
+          return ProjectEntry(
+            name: s(m['name']),
+            description: s(m['description']),
+            link: s(m['link']),
           );
         }));
     }
@@ -175,6 +213,16 @@ class ResumeBuilderController extends ChangeNotifier {
 
   void removeEducation(int i) {
     if (education.length > 1) education.removeAt(i);
+    notifyListeners();
+  }
+
+  void addProject() {
+    projects.add(ProjectEntry());
+    notifyListeners();
+  }
+
+  void removeProject(int i) {
+    if (projects.length > 1) projects.removeAt(i);
     notifyListeners();
   }
 
@@ -281,25 +329,87 @@ class ResumeBuilderController extends ChangeNotifier {
           'phone': phone,
           'location': location,
           'linkedin': linkedin,
+          'github': github,
+          'portfolio': portfolio,
         }, 0),
         sec(SectionType.summary, {'text': summary}, 1),
+        sec(SectionType.skills, {'items': List<String>.from(skills)}, 2),
+        sec(SectionType.projects, {
+          'items': projects
+              .where((p) => p.name.trim().isNotEmpty || p.description.trim().isNotEmpty)
+              .map((p) => p.toContent())
+              .toList(),
+        }, 3),
         sec(SectionType.experience, {
           'items': experiences
               .where((e) => e.title.trim().isNotEmpty || e.company.trim().isNotEmpty)
               .map((e) => e.toContent())
               .toList(),
-        }, 2),
+        }, 4),
         sec(SectionType.education, {
           'items': education
               .where((e) => e.degree.trim().isNotEmpty || e.school.trim().isNotEmpty)
               .map((e) => e.toContent())
               .toList(),
-        }, 3),
-        sec(SectionType.skills, {'items': List<String>.from(skills)}, 4),
-        sec(SectionType.certifications, {'items': List<String>.from(certifications)}, 5),
-        sec(SectionType.languages, {'items': List<String>.from(languages)}, 6),
+        }, 5),
+        sec(SectionType.certifications, {'items': List<String>.from(certifications)}, 6),
+        sec(SectionType.languages, {'items': List<String>.from(languages)}, 7),
       ],
     );
+  }
+
+  /// Flattens whatever the user has entered so far into a plain-text brief that
+  /// the AI uses as the factual basis for a full-resume generation. Only real
+  /// facts go in — the AI is instructed to enrich wording, not invent history.
+  String aiDetails() {
+    final b = StringBuffer();
+    void line(String label, String v) {
+      if (v.trim().isNotEmpty) b.writeln('$label: ${v.trim()}');
+    }
+
+    line('Name', fullName);
+    line('Target title', title);
+    line('Email', email);
+    line('Phone', phone);
+    line('Location', location);
+    line('LinkedIn', linkedin);
+    line('GitHub', github);
+    line('Portfolio', portfolio);
+    if (summary.trim().isNotEmpty) line('Current summary', summary);
+
+    final exp = experiences.where((e) => e.title.trim().isNotEmpty || e.company.trim().isNotEmpty).toList();
+    if (exp.isNotEmpty) {
+      b.writeln('Experience:');
+      for (final e in exp) {
+        final end = e.current ? 'Present' : e.endDate;
+        b.writeln('  - ${e.title} at ${e.company} (${e.startDate} – $end)');
+        for (final bul in e.bullets.where((x) => x.trim().isNotEmpty)) {
+          b.writeln('    • ${bul.trim()}');
+        }
+      }
+    }
+
+    final edu = education.where((e) => e.degree.trim().isNotEmpty || e.school.trim().isNotEmpty).toList();
+    if (edu.isNotEmpty) {
+      b.writeln('Education:');
+      for (final e in edu) {
+        b.writeln('  - ${e.degree}, ${e.school} (${e.startDate} – ${e.endDate})');
+      }
+    }
+
+    final proj = projects.where((p) => p.name.trim().isNotEmpty).toList();
+    if (proj.isNotEmpty) {
+      b.writeln('Projects:');
+      for (final p in proj) {
+        b.writeln('  - ${p.name}: ${p.description}${p.link.trim().isEmpty ? '' : ' (${p.link})'}');
+      }
+    }
+
+    if (skills.isNotEmpty) line('Skills', skills.join(', '));
+    if (certifications.isNotEmpty) line('Certifications', certifications.join(', '));
+    if (languages.isNotEmpty) line('Languages', languages.join(', '));
+
+    return b.toString().trim();
   }
 }
 

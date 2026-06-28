@@ -37,7 +37,11 @@ class AppButton extends StatelessWidget {
                 Icon(icon, size: 18),
                 const SizedBox(width: 8),
               ],
-              Text(label),
+              // Shrink/ellipsize rather than overflow when the button is narrow
+              // (e.g. three buttons sharing a row).
+              Flexible(
+                child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+              ),
             ],
           );
 

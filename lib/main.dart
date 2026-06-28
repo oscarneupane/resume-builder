@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'app/router.dart';
+import 'core/constants.dart';
 import 'services/supabase_service.dart';
 
 Future<void> main() async {
@@ -14,5 +17,14 @@ Future<void> main() async {
     // No .env yet — services will run in mock mode.
   }
   await SupabaseService.initialize();
-  runApp(const ProviderScope(child: ApplyMateApp()));
+
+  // Seed the onboarding flag synchronously so the router redirect is correct on
+  // first frame (the flag flips to true the moment onboarding finishes).
+  final prefs = await SharedPreferences.getInstance();
+  final hasOnboarded = prefs.getBool(AppConstants.prefHasOnboarded) ?? false;
+
+  runApp(ProviderScope(
+    overrides: [onboardingFlagProvider.overrideWith((ref) => hasOnboarded)],
+    child: const ApplyMateApp(),
+  ));
 }

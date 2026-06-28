@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,14 +13,14 @@ import '../../../shared/widgets/app_text_field.dart';
 
 /// 5-question onboarding (Screen 2). Result saved locally so the profile
 /// step on first login can upsert it into the `profiles` table.
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   int _step = 0;
   final _payload = <String, dynamic>{};
   final _jobTitleController = TextEditingController();
@@ -51,6 +52,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setBool(AppConstants.prefHasOnboarded, true);
     await prefs.setString(AppConstants.prefOnboardingPayload, jsonEncode(_payload));
     if (!mounted) return;
+    // Flip the in-memory flag so the router lets us past onboarding immediately.
+    ref.read(onboardingFlagProvider.notifier).state = true;
     context.go(AppRoutes.signup);
   }
 
@@ -252,7 +255,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary.withOpacity(0.08) : AppColors.cardSurface,
+            color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.cardSurface,
             borderRadius: BorderRadius.circular(AppRadii.card),
             border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
           ),

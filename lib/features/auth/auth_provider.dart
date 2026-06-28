@@ -81,6 +81,8 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> sendPasswordReset(String email) => _repo.sendPasswordReset(email);
+
+  Future<void> deleteAccount() => _repo.deleteAccount();
 }
 
 final authControllerProvider = ChangeNotifierProvider<AuthController>(
