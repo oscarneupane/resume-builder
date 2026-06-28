@@ -171,6 +171,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const _OnboardingBrandHeader(),
+        const SizedBox(height: 24),
         Text(question, style: Theme.of(context).textTheme.displaySmall),
         const SizedBox(height: 20),
         ...opts.map((o) => _choiceCard(
@@ -189,6 +191,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const _OnboardingBrandHeader(),
+        const SizedBox(height: 24),
         Text(question, style: Theme.of(context).textTheme.displaySmall),
         const SizedBox(height: 8),
         Text(subtitle, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
@@ -203,6 +207,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const _OnboardingBrandHeader(),
+        const SizedBox(height: 24),
         Text(question, style: Theme.of(context).textTheme.displaySmall),
         const SizedBox(height: 20),
         ...options.map((o) => _choiceCard(
@@ -221,6 +227,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const _OnboardingBrandHeader(),
+        const SizedBox(height: 24),
         Text(question, style: Theme.of(context).textTheme.displaySmall),
         const SizedBox(height: 20),
         Wrap(
@@ -269,6 +277,37 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OnboardingBrandHeader extends StatelessWidget {
+  const _OnboardingBrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/branding/applymate-logo.png',
+            width: 56,
+            height: 56,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('ApplyMate', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Build better applications',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
