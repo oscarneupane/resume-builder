@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../core/extensions.dart';
 import '../../../shared/utils/validators.dart';
+import '../../../shared/widgets/address_autocomplete_field.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../controllers/resume_builder_controller.dart';
@@ -54,6 +55,13 @@ class PersonalStep extends StatelessWidget {
             validator: Validators.phone,
           ),
           const SizedBox(height: 12),
+          AddressAutocompleteField(
+            label: 'Location / address *',
+            hint: 'Start typing your address…',
+            initialValue: c.location,
+            onChanged: (v) => c.location = v,
+            validator: (v) => Validators.required(v, 'Location'),
+          ),
           AddressField(c),
           const SizedBox(height: 12),
           AppTextField(label: 'LinkedIn URL', initialValue: c.linkedin, onChanged: (v) => c.linkedin = v),

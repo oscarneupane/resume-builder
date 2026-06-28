@@ -144,6 +144,10 @@ class AiService {
       if (res.statusCode == 429) {
         return AiResult.failure('${p.name} is rate-limited or out of quota. Try again shortly or switch provider.');
       }
+      if (res.statusCode == 429) {
+        return const AiResult.failure(
+            'OpenAI quota exceeded. Add credit/billing at platform.openai.com → Settings → Billing.');
+      }
       if (res.statusCode >= 400) {
         return AiResult.failure('${p.name} request failed (${res.statusCode}).');
       }
@@ -573,6 +577,11 @@ class AiService {
       if (res.statusCode == 401) {
         return AiResult.failure('${provider.name} rejected the API key. Check your key in .env.');
       }
+      if (res.statusCode == 429) {
+        return const AiResult.failure(
+            'OpenAI quota exceeded. Add credit/billing at platform.openai.com → Settings → Billing.');
+      }
+      if (res.statusCode >= 400) return AiResult.failure('Scan failed (${res.statusCode}).');
       if (res.statusCode >= 400) return AiResult.failure('Scan failed (${provider.name} ${res.statusCode}).');
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final out = (body['choices']?[0]?['message']?['content'] as String?)?.trim() ?? '';
